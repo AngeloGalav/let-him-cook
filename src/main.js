@@ -200,5 +200,5 @@
   }
 
   loadLevel(0);
-  requestAnimationFrame(draw);
+  draw(0); // paint the first frame synchronously; draw() re-arms rAF itself
 })();
