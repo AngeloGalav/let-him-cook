@@ -34,29 +34,33 @@ Use a dedicated profile — the user's Firefox is usually running.
   step → sound-turn → cone-check → win-check), listener hearing + stare,
   reveal memory, undo, 6 solvable levels, canvas renderer with beam pulse,
   violet listeners with sound-ring when alerted, caught/won/done overlays.
-- Renderer verified in real (headless) Firefox: level 1, level 5 start /
-  stare / caught-by-stare, level 6 start. First frame draws synchronously
-  so screenshots and instant loads work.
-- 17 tests: cone geometry, turn order, pause tells, memory, serialize,
-  listener rules (6 new), every level solvable + replayed.
+- Cone geometry is now EXACT integer math (S3): wedge test is
+  `2*dot*dot >= d2*f2` with `d2 <= 16`, diagonal edge tiles included, no
+  float noise, works for any integer facing vector. Relative to facing,
+  visible set = own tile + {dx 1..4, |dy| <= dx, dx²+dy² <= 16}. Compared
+  to the old float version this adds exactly 4 tiles per guard: the 45°
+  diagonals at distance 1 and 2 ((3,3)/(4,4) were always range-excluded).
+  All 6 levels re-proved solvable; one test-only listener level needed a
+  redesign (its dash lane got swept by the widened stare).
+- Renderer verified in real (headless) Firefox (re-checked S3 after the
+  geometry change): level 1, level 5 start / stare / caught-by-stare,
+  level 6 start. First frame draws synchronously so screenshots and
+  instant loads work.
+- 19 tests: cone geometry (exact set + rotation symmetry across facings),
+  turn order, pause tells, memory, serialize, listener rules (6), every
+  level solvable + replayed.
 
 ## Next (ranked)
-1. Fix the 45°-diagonal float boundary in coneOf: tiles exactly on the wedge
-   edge (dx==dy) are included for some distances and not others (k=3 in,
-   k=1,2,4 out — float noise). Both engines use the same function so they
-   agree, but the wedge has notches and it's luck-dependent. Decide: include
-   edges (dot >= COS - eps) or exclude, then RE-VERIFY all level solvability
-   (beams get wider if included; levels may need redesign).
-2. More levels (7–9): a pillar room where blocked line-of-sight makes heard
+1. More levels (7–9): a pillar room where blocked line-of-sight makes heard
    tiles safe (the one way to break the listener's moving wall — see dead
    ends); two listeners (mask already supports it); a level forcing you to
    use a blocked stare as a light source.
-3. Beam rendering upgrade: smooth polygon fan (raycast edges) instead of
+2. Beam rendering upgrade: smooth polygon fan (raycast edges) instead of
    per-tile squares; also the amber pulse reads muddy-brown at alpha 0.16 —
    try additive-ish brighter overlay.
-4. Mobile: on-screen d-pad + swipe; turn-based so it fits phones.
-5. "Ghost" of your best run (fewest turns) as a faint afterimage.
-6. Sound-detection feedback: a subtle audio cue or screen-edge flash when a
+3. Mobile: on-screen d-pad + swipe; turn-based so it fits phones.
+4. "Ghost" of your best run (fewest turns) as a faint afterimage.
+5. Sound-detection feedback: a subtle audio cue or screen-edge flash when a
    listener hears you (currently the ring is the only tell).
 
 ## Dead ends
@@ -83,6 +87,15 @@ Use a dedicated profile — the user's Firefox is usually running.
   reaches you kills you (no reveal value), and a blocked stare only lights
   tiles you already feel by touch. A level built on it needs the pillar
   geometry from the dead end above to give it a point.
+- S2's note "diagonal k=3 is in the cone, k=1,2,4 out" was WRONG: the range
+  check (d<=4) already excluded (3,3) and (4,4), so the old float wedge
+  excluded ALL diagonal edge tiles. The S3 fix (edges included) therefore
+  only adds the 45° tiles at distance 1–2 — far less disruptive than the
+  feared "beams get wider, levels may need redesign". Listener moving-wall
+  theorem unchanged: dy=3 lanes are still beam-unreachable.
+- Rotation tests in screen coords (y DOWN): the map that rotates facing
+  north to east is (x,y)->(-y,x), NOT (x,y)->(y,-x). Tripped on this twice
+  in one session; the west map (-x,-y) is the only direction-agnostic one.
 - `node --test test/` (trailing slash) fails on node 22; use `node --test`.
 - Do NOT `cp templates/*.md` over filled NOTES/DEVLOG (did it in S2; git
   checkout saved it).
@@ -96,3 +109,9 @@ Use a dedicated profile — the user's Firefox is usually running.
   draws synchronously). Added the listener guard end-to-end: rules, solver
   alert-mask, 6 tests, violet rendering + sound ring, levels 5 and 6, URL
   test hooks. Discovered the listener moving-wall theorem (see Dead ends).
+- S3 (2026-11-18): Killed the cone float-noise item: coneOf now uses exact
+  integer arithmetic (2·dot² ≥ d²·|f|², d² ≤ 16), diagonal edges included.
+  Actual change: +4 tiles per guard (45° at distance 1–2). All 6 levels
+  re-proved by the solver; one test-only listener level redesigned (old dash
+  lane now swept). Added exact-wedge-set and rotation-symmetry tests → 19.
+  Re-verified renderer in headless Firefox.
