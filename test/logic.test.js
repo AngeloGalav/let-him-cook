@@ -542,3 +542,69 @@ test('classifySwipe: results are valid actions for takeTurn', () => {
   assert.ok(G.takeTurn(st, G.classifySwipe(0, 0)), 'tap (wait) consumed the turn');
   assert.strictEqual(st.player.x, 2, 'tap did not move the player');
 });
+
+// ---------- level 10: The Black Hall (stare as a light source) ----------
+//
+// The gimmick: a listener whose hearing (4) reaches as far as its sight.
+// From the dark hall (rows 4-5, unreachable by the patrol beam) you can
+// move in earshot but outside the stare's reach: it snaps to face you and
+// its beam falls down its column, lighting the hall for one beat. The
+// solver cannot verify the player NEEDS the light (it has full info), so
+// these tests pin the design-inspection properties: the hall is dark in
+// every patrol phase, the trigger ring is heard-but-unlit, and a lured
+// stare is the only thing that lights the exit.
+
+const hall = LEVELS.find(l => l.name.indexOf('Black Hall') >= 0);
+
+test('black hall: the dark zone and the exit are dark in every patrol phase', () => {
+  assert.ok(hall, 'level 10 exists');
+  const g0 = hall.guards[0];
+  assert.strictEqual(g0.type, 'listener');
+  assert.strictEqual(g0.hearing, 4, 'hearing must match sight range for the trick');
+  const st = G.createGame(hall);
+  const cycle = G.cycleLength(hall);
+  for (let t = 0; t < cycle; t++) {
+    const gp = G.guardAt(hall, 0, t);
+    const cone = G.coneOf(st, gp);
+    for (const c of cone) {
+      assert.ok(c.y <= 3,
+        'phase ' + t + ': patrol beam leaked into the dark hall at ' + c.x + ',' + c.y);
+    }
+  }
+});
+
+test('black hall: heard-but-unseen trigger ring (move = flash, not death)', () => {
+  const st = G.createGame(hall);
+  const g = st.guards[0];
+  g.x = 8; g.y = 1; // any street column; geometry is translation-invariant here
+  const south = { x: 0, y: 1 };
+  const staredAt = (x, y) =>
+    G.coneOf(st, { x: 8, y: 1, facing: south }).some(t => t.x === x && t.y === y);
+  // Row 5 (dy=4): lateral 1..3 is heard AND outside the stare (the safe
+  // trigger zone); lateral 0 is directly beneath and lethal; lateral 5 is
+  // out of earshot (no flash at all).
+  for (const dx of [1, 2, 3]) {
+    assert.ok(G.hears(g, 8 + dx, 5), 'dx=' + dx + ' is heard');
+    assert.ok(!staredAt(8 + dx, 5), 'dx=' + dx + ' survives the stare');
+  }
+  assert.ok(G.hears(g, 8, 5), 'directly beneath is heard');
+  assert.ok(staredAt(8, 5), 'directly beneath dies to the stare');
+  assert.ok(!G.hears(g, 13, 5), 'dx=5 is out of earshot');
+});
+
+test('black hall: the exit is invisible until a lured stare lights it', () => {
+  const st = G.createGame(hall);
+  const cycle = G.cycleLength(hall);
+  for (let t = 0; t < cycle; t++) {
+    const gp = G.guardAt(hall, 0, t);
+    const lit = G.coneOf(st, gp).some(c => c.x === 13 && c.y === 4);
+    assert.ok(!lit, 'phase ' + t + ': exit visible without a stare');
+  }
+  // A south stare from columns 11-13 reaches (13,4): stand at row 5 within
+  // lateral 3 of the guard, move, and the flash reveals the exit.
+  for (const gx of [11, 12, 13]) {
+    const lit = G.coneOf(st, { x: gx, y: 1, facing: { x: 0, y: 1 } })
+      .some(c => c.x === 13 && c.y === 4);
+    assert.ok(lit, 'stare from x=' + gx + ' lights the exit');
+  }
+});

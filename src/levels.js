@@ -197,6 +197,22 @@
         { route: ping(2, 3, 8, 3, 1) },
         { route: ping(15, 3, 10, 3, 1), type: 'listener', hearing: 2 }
       ]
+    },
+    {
+      name: '10 · The Black Hall',
+      hint: 'It hears four tiles but only sees four. Stand in the black hall below, never directly beneath, and move: the stare flashes down its column and lights what you cannot see.',
+      grid: [
+        '###############',
+        '#.............#',
+        '#.............#',
+        '#.............#',
+        '#......#.....E#',
+        '#P.....#......#',
+        '###############'
+      ],
+      guards: [
+        { route: ping(2, 1, 13, 1, 1), type: 'listener', hearing: 4 }
+      ]
     }
   ];
 
