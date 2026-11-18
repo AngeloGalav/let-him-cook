@@ -807,6 +807,128 @@ test('wake: the escape is a long ride — no shortcut exists', () => {
     'the shortest escape must be a multi-leg ride (solver found ' + sol.length + ')');
 });
 
+// ---------- level 13: The Belfry (two bells, one pillar) ----------
+//
+// Two listeners on PERPENDICULAR streets, hearing SMALLER than sight (2 and
+// 3): a bell rung in the open dies to its own summoned stare (the stare
+// points at the ringer and, with hearing <= sight, always reaches). So each
+// bell tile must be heard-but-blocked: a pillar on the rounded midpoint of
+// the guard->ringer sight line. The pillar at (3,2) does double duty — it
+// blocks the watcher's south stare from (3,3)/(2,3) and the listener's east
+// stare from (4,2)/(4,1) (the (1,3)->(4,2) line rounds through it). The
+// chain: every tile that rings the watcher south sits in columns 1-3, the
+// listener's own beam band; every tile that rings the listener along row 3
+// sits in rows 1-3, the watcher's sweep. Each bell is a moving pocket of the
+// OTHER guard's beam — two bells timed against each other. The pillar at
+// (2,6) gates the final step: it blocks the listener's north stare from its
+// south end, so the exit tile is steppable only while the listener sits
+// turned at the bottom of its street.
+
+const belfry = LEVELS.find(l => l.name.indexOf('Belfry') >= 0);
+
+// Tiles from which a MOVE would ring guard gi into `dir` and survive it:
+// floor, within hearing, soundFacing == dir, and NOT lit by that stare cone.
+function ringTiles(level, gi, dir) {
+  const st = G.createGame(level);
+  const g = level.guards[gi];
+  const hearing = g.hearing == null ? 3 : g.hearing;
+  const out = [];
+  const seenPos = new Set();
+  for (const pos of g.route) {
+    const pk = pos.join(',');
+    if (seenPos.has(pk)) continue;
+    seenPos.add(pk);
+    const stare = new Set(
+      G.coneOf(st, { x: pos[0], y: pos[1], facing: dir }).map(c => c.x + ',' + c.y));
+    for (let y = 0; y < st.h; y++) for (let x = 0; x < st.w; x++) {
+      if (G.isWall(st, x, y)) continue;
+      if (Math.max(Math.abs(x - pos[0]), Math.abs(y - pos[1])) > hearing) continue;
+      const f = G.soundFacing({ x: pos[0], y: pos[1], facing: { x: 1, y: 0 } }, x, y);
+      if (f.x !== dir.x || f.y !== dir.y) continue;
+      if (stare.has(x + ',' + y)) continue;
+      out.push({ gx: pos[0], gy: pos[1], x: x, y: y });
+    }
+  }
+  return out;
+}
+
+test('belfry: the watcher\'s bell tiles all stand in the listener\'s beam band', () => {
+  assert.ok(belfry, 'level 13 exists');
+  const rings = ringTiles(belfry, 0, { x: 0, y: 1 });
+  const tiles = [...new Set(rings.map(r => r.x + ',' + r.y))].sort();
+  assert.deepStrictEqual(tiles, ['2,3', '3,3'],
+    'exactly two bell tiles, both shielded by the pillar at (3,2)');
+  for (const r of rings) {
+    assert.ok(r.x <= 3, 'bell tile ' + r.x + ',' + r.y + ' must sit in the listener\'s band (cols 1-3)');
+  }
+  // The rung stare is the only light on the exit: a south stare from (2,1)
+  // lights (2,5) — and the pillar keeps it from killing the ringer at (3,3).
+  const st = G.createGame(belfry);
+  assert.ok(G.coneOf(st, { x: 2, y: 1, facing: { x: 0, y: 1 } })
+    .some(c => c.x === 2 && c.y === 5), 'the column-2 flash lights the exit');
+  assert.ok(!G.coneOf(st, { x: 2, y: 1, facing: { x: 0, y: 1 } })
+    .some(c => c.x === 3 && c.y === 3), 'the pillar shields the ringer at (3,3)');
+});
+
+test('belfry: the listener\'s row-3 bell tiles stand in the watcher\'s sweep rows', () => {
+  const rings = ringTiles(belfry, 1, { x: 1, y: 0 });
+  // The flash that matters lights row 3 (the crossing row, the watcher's
+  // bell tile at (3,3), out to (5,3)); it needs the listener at (1,3).
+  const row3 = rings.filter(r => r.gy === 3).map(r => r.x + ',' + r.y).sort();
+  // In the watcher's sweep rows (1-3) the ring tiles are exactly the two
+  // crossing tiles, shielded via the (3,2) midpoint rounding: the crossing
+  // step IS the bell ring. The column-4 tiles (4,4),(4,5) also ring it from
+  // the listener's own gate column — every ring sits in a guard's beam zone.
+  assert.deepStrictEqual(row3.filter(s => Number(s[0]) <= 4 && Number(s.split(',')[1]) <= 3).sort(),
+    ['4,1', '4,2']);
+  assert.deepStrictEqual(row3, ['4,1', '4,2', '4,4', '4,5']);
+  for (const r of rings.filter(r => r.gy === 3 && r.y <= 3)) {
+    assert.ok(r.x === 4, 'sweep-row ring tile must be on the crossing column');
+  }
+  const st = G.createGame(belfry);
+  const east = G.coneOf(st, { x: 1, y: 3, facing: { x: 1, y: 0 } });
+  for (const x of [2, 3, 4, 5]) {
+    assert.ok(east.some(c => c.x === x && c.y === 3), 'row-3 flash reaches column ' + x);
+  }
+  // Only the (1,3) stare reaches (5,3): rows 2 and 4 are past the disc.
+  for (const gy of [2, 4]) {
+    assert.ok(!G.coneOf(st, { x: 1, y: gy, facing: { x: 1, y: 0 } })
+      .some(c => c.x === 5 && c.y === 3), 'row ' + gy + ' stare must not reach (5,3)');
+  }
+});
+
+test('belfry: the exit is never lit by the watcher; the listener grazes it at four pinned beats', () => {
+  const st = G.createGame(belfry);
+  const cycle = G.cycleLength(belfry);
+  const tease = [];
+  for (let t = 0; t < cycle; t++) {
+    assert.ok(!G.coneOf(st, G.guardAt(belfry, 0, t)).some(c => c.x === 2 && c.y === 5),
+      'phase ' + t + ': the watcher lit the exit without being rung');
+    if (G.coneOf(st, G.guardAt(belfry, 1, t)).some(c => c.x === 2 && c.y === 5)) tease.push(t);
+  }
+  // B's beam grazes the door on its way past (row 6 north, rows 2-4 south);
+  // the pillar at (2,6) kills the rows 7-8 grazes. A one-tile glimpse,
+  // never the way there.
+  assert.deepStrictEqual(tease, [1, 5, 6, 7]);
+});
+
+test('belfry: the final step is survivable only at the listener\'s south end', () => {
+  const cycle = G.cycleLength(belfry);
+  const safe = [];
+  for (let t = 0; t < cycle; t++) {
+    const st = G.createGame(belfry);
+    for (let i = 0; i < t; i++) G.takeTurn(st, { wait: true }); // waits are silent
+    st.player = { x: 3, y: 5 };
+    G.takeTurn(st, { dx: -1, dy: 0 }); // step onto the exit
+    if (st.status !== 'caught') safe.push(t);
+  }
+  // t9-12: the listener is at rows 6-8 (its south end). Facing south the
+  // door is behind its beam; facing north its stare at the door is blocked
+  // by the pillar at (2,6). Everywhere else the hear-and-stare reaches the
+  // door (adjacent diagonals cannot be blocked).
+  assert.deepStrictEqual(safe, [9, 10, 11, 12]);
+});
+
 // ---------- ghost: best-run recording ----------
 
 test('ghost: encodeRun/decodeRun round-trip', () => {

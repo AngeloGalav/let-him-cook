@@ -31,6 +31,11 @@
     return out;
   }
 
+  // Phase-shift a cyclic route by k steps: same cycle, different start beat.
+  function rot(route, k) {
+    return route.slice(k).concat(route.slice(0, k));
+  }
+
   var LEVELS = [
     {
       name: '1 · The Long Hall',
@@ -254,10 +259,33 @@
         { route: ping(2, 3, 12, 3, 1) },   // upper street, starts west facing east
         { route: ping(12, 9, 2, 9, 1) }    // lower street, starts east facing west
       ]
+    },
+    {
+      name: '13 · The Belfry',
+      hint: 'Two bells hang in the dark, and one pillar stands between each bell and the stare it summons. The tile that rings the watcher lies in the listener\'s beam; the tile that rings the listener lies in the watcher\'s. Ring them on their beats: the watcher\'s stare falls down its column, the listener\'s along its row — and the door hides in the watcher\'s column.',
+      grid: [
+        '##########',
+        '#........#',
+        '#..#.....#',
+        '#........#',
+        '#..#.....#',
+        '#.E......#',
+        '#.#.#....#',
+        '#...#....#',
+        '#...#...P#',
+        '##########'
+      ],
+      guards: [
+        { route: ping(2, 1, 8, 1, 1), type: 'listener', hearing: 2 },
+        // Phase-shifted so the listener passes (1,3)-south on the beat the
+        // watcher pauses at its east end: the crossing step onto (4,2) then
+        // doubles as the row-3 bell ring.
+        { route: rot(ping(1, 2, 1, 8, 1), 8), type: 'listener', hearing: 3 }
+      ]
     }
   ];
 
-  var TheirEyesLevels = { LEVELS: LEVELS, line: line, ping: ping };
+  var TheirEyesLevels = { LEVELS: LEVELS, line: line, ping: ping, rot: rot };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = TheirEyesLevels;
   if (typeof window !== 'undefined') window.TheirEyesLevels = TheirEyesLevels;
