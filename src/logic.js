@@ -541,6 +541,30 @@
     return { path: path, turns: st.turn, status: st.status };
   }
 
+  // ---------- level select (the halls screen) ----------
+
+  // Progression ladder, pure: level 0 is always open; level i opens once
+  // level i-1 is cleared (a best run is stored for it). `cleared` is an
+  // array of booleans indexed by level; it may be shorter than `count`.
+  function unlockedLevels(cleared, count) {
+    var out = [];
+    for (var i = 0; i < count; i++) {
+      out.push(i === 0 || !!cleared[i - 1]);
+    }
+    return out;
+  }
+
+  // Where the halls screen parks its cursor on open: the first level that
+  // is unlocked and not yet cleared. If everything is cleared, back to 0 —
+  // by then every door is open anyway.
+  function firstOpenLevel(cleared, count) {
+    var un = unlockedLevels(cleared, count);
+    for (var i = 0; i < count; i++) {
+      if (un[i] && !cleared[i]) return i;
+    }
+    return 0;
+  }
+
   var TheirEyes = {
     CONE_RADIUS: CONE_RADIUS,
     createGame: createGame,
@@ -563,7 +587,9 @@
     encodeRun: encodeRun,
     decodeRun: decodeRun,
     isBetterRun: isBetterRun,
-    replay: replay
+    replay: replay,
+    unlockedLevels: unlockedLevels,
+    firstOpenLevel: firstOpenLevel
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = TheirEyes;

@@ -714,3 +714,23 @@ test('heard: anyAlerted survives the undo round-trip', () => {
   G.restore(st, snap);
   assert.strictEqual(G.anyAlerted(st), true, 'undo restores the heard state');
 });
+
+// ---------- halls screen (level-select ladder) ----------
+
+test('halls: level 0 always open, level i opens once i-1 is cleared', () => {
+  assert.deepStrictEqual(G.unlockedLevels([false, false, false], 3), [true, false, false]);
+  assert.deepStrictEqual(G.unlockedLevels([true, false, false], 3), [true, true, false]);
+  assert.deepStrictEqual(G.unlockedLevels([true, true, true], 3), [true, true, true]);
+  // a cleared level does not skip a rung: the ladder is one step at a time
+  assert.deepStrictEqual(G.unlockedLevels([true, false, true], 3), [true, true, false]);
+  // a short cleared array reads as "not cleared" for the missing entries
+  assert.deepStrictEqual(G.unlockedLevels([true], 3), [true, true, false]);
+});
+
+test('halls: firstOpenLevel points at the next uncleared unlocked level', () => {
+  assert.strictEqual(G.firstOpenLevel([false, false, false], 3), 0);
+  assert.strictEqual(G.firstOpenLevel([true, false, false], 3), 1);
+  assert.strictEqual(G.firstOpenLevel([true, true, false], 3), 2);
+  // all cleared: back to 0, every door is open by then anyway
+  assert.strictEqual(G.firstOpenLevel([true, true, true], 3), 0);
+});

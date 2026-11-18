@@ -25,6 +25,10 @@
   var newBest = false;
   var ripples = [];   // decorative sound rings: { x, y, t0 } (performance.now)
   var userGestured = false; // browsers only allow audio after a real gesture
+  var screen = 'game';      // 'game' | 'halls' — the halls screen is the hub
+  var selCursor = 0;        // keyboard cursor on the halls screen
+  var hallBests = null;     // cache of per-level best runs; null = stale
+  var HALLS_W = 648, HALLS_H = 500; // logical size of the halls screen
 
   // ---------- sound: the "you were heard" thud ----------
   // A short low sine thump, synthesized on the fly (no assets). The context is
@@ -93,6 +97,23 @@
       window.localStorage.setItem(bestKey(i),
         JSON.stringify({ turns: run.turns, path: G.encodeRun(run.path) }));
     } catch (e) { /* no storage: no ghost */ }
+    hallBests = null; // halls screen must re-read
+  }
+
+  // Cached per-level best runs for the halls screen (localStorage reads are
+  // cheap but not at 60 fps). Invalidated by saveBest and by openHalls.
+  function bestAt(i) {
+    if (!hallBests) {
+      hallBests = [];
+      for (var j = 0; j < LEVELS.length; j++) hallBests.push(loadBest(j));
+    }
+    return hallBests[i];
+  }
+
+  function clearedFlags() {
+    var out = [];
+    for (var i = 0; i < LEVELS.length; i++) out.push(!!bestAt(i));
+    return out;
   }
 
   function loadLevel(i) {
@@ -104,16 +125,17 @@
     ripples = [];
     best = loadBest(i);
     newBest = false;
-    fitCanvas();
+    fitCanvas(game.w * TILE, game.h * TILE);
     nameEl.textContent = LEVELS[i].name;
     hintEl.textContent = LEVELS[i].hint;
   }
 
   // Scale the canvas down to fit narrow screens (phones); never upscale past
   // the native tile size. The backing store follows the display size times
-  // devicePixelRatio so everything stays sharp on high-DPI phones.
-  function fitCanvas() {
-    var w = game.w * TILE, h = game.h * TILE;
+  // devicePixelRatio so everything stays sharp on high-DPI phones. Takes the
+  // logical size so the halls screen can use its own (the game canvas size
+  // changes per level).
+  function fitCanvas(w, h) {
     var avail = Math.max(240, Math.min(window.innerWidth, document.documentElement.clientWidth) - 40);
     var scale = Math.min(1, avail / w);
     var dpr = window.devicePixelRatio || 1;
@@ -122,6 +144,86 @@
     canvas.width = Math.round(w * scale * dpr);
     canvas.height = Math.round(h * scale * dpr);
     ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+  }
+
+  function logicalSize() {
+    return screen === 'halls'
+      ? { w: HALLS_W, h: HALLS_H }
+      : { w: game.w * TILE, h: game.h * TILE };
+  }
+
+  // ---------- the halls screen (level select) ----------
+  // A hub drawn on the same canvas: one card per level, best time from the
+  // ghost storage, and a lock ladder (level i opens once i-1 is cleared).
+  // Opening it mid-run does not touch the game state, so L is also "peek".
+
+  function openHalls() {
+    if (screen === 'halls') return;
+    screen = 'halls';
+    hallBests = null; // always show fresh times after a win
+    selCursor = G.firstOpenLevel(clearedFlags(), LEVELS.length);
+    fitCanvas(HALLS_W, HALLS_H);
+    nameEl.textContent = 'The Halls';
+    hintEl.textContent = '';
+    turnsEl.textContent = '';
+  }
+
+  function closeHalls() {
+    if (screen !== 'halls' || !game) return; // startup halls has nothing to return to
+    screen = 'game';
+    fitCanvas(game.w * TILE, game.h * TILE);
+    nameEl.textContent = LEVELS[levelIdx].name;
+    hintEl.textContent = LEVELS[levelIdx].hint;
+  }
+
+  function enterHall(i) {
+    var un = G.unlockedLevels(clearedFlags(), LEVELS.length);
+    if (!un[i]) return;
+    loadLevel(i);
+    screen = 'game';
+  }
+
+  // Card layout, computed fresh each use (cheap, and always matches the
+  // renderer and the hit-test). Two columns, one row per pair of levels.
+  function hallCards() {
+    var n = LEVELS.length;
+    var mx = 20, top = 64, gap = 14, vgap = 12, ch = 72;
+    var cw = (HALLS_W - mx * 2 - gap) / 2;
+    var un = G.unlockedLevels(clearedFlags(), n);
+    var cards = [];
+    for (var i = 0; i < n; i++) {
+      cards.push({
+        i: i,
+        x: mx + (i % 2) * (cw + gap),
+        y: top + Math.floor(i / 2) * (ch + vgap),
+        w: cw, h: ch,
+        unlocked: un[i],
+        best: bestAt(i)
+      });
+    }
+    return cards;
+  }
+
+  // Map a client (mouse/touch) point to logical canvas pixels.
+  function canvasPoint(clientX, clientY) {
+    var r = canvas.getBoundingClientRect();
+    var s = logicalSize();
+    return {
+      x: (clientX - r.left) * s.w / r.width,
+      y: (clientY - r.top) * s.h / r.height
+    };
+  }
+
+  // Index of the unlocked card under a logical point, or -1.
+  function cardAt(x, y) {
+    var cards = hallCards();
+    for (var k = 0; k < cards.length; k++) {
+      var c = cards[k];
+      if (x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h) {
+        return c.unlocked ? c.i : -1;
+      }
+    }
+    return -1;
   }
 
   // ---------- input ----------
@@ -175,6 +277,26 @@
       w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
       W: [0, -1], S: [0, 1], A: [-1, 0], D: [1, 0]
     };
+    if (k === 'l' || k === 'L') {
+      e.preventDefault();
+      if (screen === 'halls') closeHalls(); else openHalls();
+      return;
+    }
+    if (screen === 'halls') {
+      // arrows/wasd move the card cursor, Enter enters, Esc goes back
+      if (dirs[k]) {
+        e.preventDefault();
+        var n = LEVELS.length;
+        var next = selCursor + dirs[k][1] * 2 + dirs[k][0]; // rows are 2 wide
+        if (next >= 0 && next < n) selCursor = next;
+      } else if (k === 'Enter') {
+        e.preventDefault();
+        enterHall(selCursor);
+      } else if (k === 'Escape') {
+        closeHalls();
+      }
+      return;
+    }
     if (dirs[k]) {
       e.preventDefault();
       act({ dx: dirs[k][0], dy: dirs[k][1] });
@@ -188,6 +310,8 @@
       loadLevel(levelIdx);
     } else if (k === 'm' || k === 'M') {
       toggleMute();
+    } else if (k === 'Escape') {
+      openHalls();
     } else if (k === 'Enter') {
       nextLevel();
     }
@@ -210,10 +334,25 @@
     var dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
     touchStart = null;
     e.preventDefault();
-    if (allDone) { loadLevel(0); return; }
+    if (screen === 'halls') {
+      var pt = canvasPoint(t.clientX, t.clientY);
+      var i = cardAt(pt.x, pt.y);
+      if (i >= 0) enterHall(i);
+      return;
+    }
+    if (allDone) { openHalls(); return; }
     if (game.status === 'caught') { loadLevel(levelIdx); return; }
     if (game.status === 'won') { nextLevel(); return; }
     act(G.classifySwipe(dx, dy));
+  });
+
+  // Mouse support for the halls screen (desktop players without a keyboard,
+  // or just preferring a click). The game screen itself stays keyboard-driven.
+  canvas.addEventListener('click', function (e) {
+    if (screen !== 'halls') return;
+    var pt = canvasPoint(e.clientX, e.clientY);
+    var i = cardAt(pt.x, pt.y);
+    if (i >= 0) enterHall(i);
   });
 
   // On-screen d-pad (shown only in touch mode, see body.touch in the CSS).
@@ -232,6 +371,9 @@
         if (name === 'undo') undo();
         else if (name === 'restart') loadLevel(levelIdx);
         else if (name === 'sound') toggleMute();
+        else if (name === 'halls') {
+          if (screen === 'halls') closeHalls(); else openHalls();
+        }
         else act(TOUCH_ACTIONS[name]);
       });
     })(pads[p]);
@@ -249,7 +391,63 @@
     ctx.closePath();
   }
 
+  // The halls screen: a grid of cards, one per level. Cleared halls show
+  // their best time (the ghost's record); locked ones show only a number.
+  function drawHalls(now) {
+    ctx.clearRect(0, 0, HALLS_W, HALLS_H);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#c9d2e4';
+    ctx.font = '22px ui-monospace, monospace';
+    ctx.fillText('T H E   H A L L S', HALLS_W / 2, 38);
+    var cards = hallCards();
+    for (var k = 0; k < cards.length; k++) {
+      var c = cards[k];
+      var cur = (k === selCursor);
+      roundRect(c.x, c.y, c.w, c.h, 10);
+      ctx.fillStyle = c.unlocked ? (cur ? '#151a28' : '#0e1119') : '#0a0c12';
+      ctx.fill();
+      if (cur) {
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(143,216,255,' + (0.6 + 0.3 * Math.sin(now / 300)).toFixed(3) + ')';
+      } else {
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = c.unlocked ? '#262c40' : '#161a26';
+      }
+      ctx.stroke();
+      ctx.textAlign = 'left';
+      var lx = c.x + 16;
+      ctx.font = '15px ui-monospace, monospace';
+      if (c.unlocked) {
+        ctx.fillStyle = '#e6edf6';
+        ctx.fillText(LEVELS[c.i].name, lx, c.y + 30);
+        ctx.font = '12px ui-monospace, monospace';
+        if (c.best) {
+          ctx.fillStyle = '#34d399';
+          ctx.fillText('best ' + c.best.turns + ' turns', lx, c.y + 52);
+        } else {
+          ctx.fillStyle = '#3e465e';
+          ctx.fillText('unexplored', lx, c.y + 52);
+        }
+      } else {
+        ctx.fillStyle = '#3e465e';
+        ctx.fillText((c.i + 1) + ' · locked', lx, c.y + 30);
+        ctx.font = '12px ui-monospace, monospace';
+        ctx.fillText('escape the hall before it', lx, c.y + 52);
+      }
+    }
+    ctx.textAlign = 'center';
+    ctx.font = '12px ui-monospace, monospace';
+    ctx.fillStyle = '#566080';
+    var line;
+    if (!game) line = touchMode ? 'tap a hall to begin' : 'arrows + enter to begin';
+    else line = touchMode ? 'tap a hall · “halls” returns to your run'
+                          : 'arrows + enter · L returns to your run';
+    ctx.fillText(line, HALLS_W / 2, HALLS_H - 16);
+    requestAnimationFrame(draw);
+  }
+
   function draw(now) {
+    if (screen === 'halls') { drawHalls(now); return; }
     var w = game.w * TILE, h = game.h * TILE;
     ctx.clearRect(0, 0, w, h);
     var vis = G.visibleNow(game);
@@ -405,7 +603,7 @@
         ctx.fillText('YOU HAVE THEIR EYES', w / 2, h / 2 - 14);
         ctx.font = '13px ui-monospace, monospace';
         ctx.fillStyle = '#5a627a';
-        ctx.fillText('every hall cleared · ' + (touchMode ? 'tap' : 'R') + ' to walk them again', w / 2, h / 2 + 16);
+        ctx.fillText('every hall cleared · ' + (touchMode ? 'tap' : 'L') + ' back to the halls', w / 2, h / 2 + 16);
       } else if (game.status === 'caught') {
         ctx.fillStyle = '#ff6b6b';
         ctx.font = '28px ui-monospace, monospace';
@@ -440,24 +638,50 @@
   }
 
   // URL test hooks for headless verification: ?level=N (1-based) selects a
-  // level, ?moves=rlduw... auto-plays a move script on load, ?touch=1 forces
-  // the touch UI on (for screenshots on a desktop browser).
+  // level and jumps straight into it (bypassing the lock ladder), ?moves=rlduw...
+  // auto-plays a move script on load, ?touch=1 forces the touch UI on (for
+  // screenshots on a desktop browser), ?halls=1 forces the halls screen.
+  // With no level/moves params the game opens on the halls screen — that is
+  // the hub a real player lands on.
   var params = new URLSearchParams(window.location.search);
   touchMode = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
               params.get('touch') === '1';
   if (touchMode) document.body.classList.add('touch');
-  var start = parseInt(params.get('level'), 10);
-  start = isNaN(start) ? 1 : Math.min(Math.max(start, 1), LEVELS.length);
-  loadLevel(start - 1);
-  window.addEventListener('resize', function () { if (game) fitCanvas(); });
   var moves = params.get('moves') || '';
-  for (var mi = 0; mi < moves.length; mi++) {
-    var m = moves[mi];
-    if (m === 'r') act({ dx: 1, dy: 0 });
-    else if (m === 'l') act({ dx: -1, dy: 0 });
-    else if (m === 'u') act({ dx: 0, dy: -1 });
-    else if (m === 'd') act({ dx: 0, dy: 1 });
-    else if (m === 'w') act({ wait: true });
+  if (params.get('halls') !== '1' && (params.get('level') !== null || moves)) {
+    var start = parseInt(params.get('level'), 10);
+    start = isNaN(start) ? 1 : Math.min(Math.max(start, 1), LEVELS.length);
+    loadLevel(start - 1);
+    screen = 'game';
+  } else {
+    screen = 'halls';
+    selCursor = G.firstOpenLevel(clearedFlags(), LEVELS.length);
+    fitCanvas(HALLS_W, HALLS_H);
+    nameEl.textContent = 'The Halls';
+  }
+  window.addEventListener('resize', function () {
+    if (screen === 'halls' || game) {
+      var s = logicalSize();
+      fitCanvas(s.w, s.h);
+    }
+  });
+  if (screen === 'game') {
+    for (var mi = 0; mi < moves.length; mi++) {
+      var m = moves[mi];
+      if (m === 'r') act({ dx: 1, dy: 0 });
+      else if (m === 'l') act({ dx: -1, dy: 0 });
+      else if (m === 'u') act({ dx: 0, dy: -1 });
+      else if (m === 'd') act({ dx: 0, dy: 1 });
+      else if (m === 'w') act({ wait: true });
+    }
+  }
+  // ?keys=... dispatches one synthetic keydown per token (comma-separated,
+  // so multi-char keys work: ?keys=l,Enter) after load, letting headless
+  // screenshots exercise the keyboard router (e.g. ?keys=l,s opens the halls
+  // screen and moves the cursor down; wasd/arrows both work there).
+  var keys = (params.get('keys') || '').split(',').filter(Boolean);
+  for (var ki = 0; ki < keys.length; ki++) {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: keys[ki] }));
   }
   draw(0); // paint the first frame synchronously; draw() re-arms rAF itself
 })();
