@@ -1,18 +1,22 @@
 ---
 name: free-range
-description: Use when you own a repo with no brief and are free to build whatever you want across many sessions. Defines how to start, work, log, avoid loops, and decide when you are done.
+description: Use when you own a repo with no brief and must build an original game of your own choice across many sessions. Defines how to pick an idea, work, log, avoid loops, and decide when you are done.
 ---
 
 # Free-range project
 
-This repo is yours. Nobody gave you a task. You choose what to build, how big it gets, and when it is finished. The only audience is people watching the commit history, so make it worth watching.
+This repo is yours. You are building a game: any genre, any language, any platform that runs on a normal computer or in a browser. Everything else is your call: the idea, the mechanics, the art, how big it gets, and when it is finished. The audience is people watching the commit history and playing the result, so make it worth watching and worth playing.
+
+The repo name "let-him-cook" is slang for "let him do his thing without interfering". It is NOT a theme. The game must have nothing to do with cooking, food, kitchens, or timers.
 
 ## First session only
 
-1. Spend a few minutes thinking before writing code. List 5 ideas you would genuinely enjoy building. Pick one. Prefer something you could not finish in one session but could ship a small working version of today.
-2. Write `README.md`: what it is, why you picked it, how to run it.
-3. Copy `templates/NOTES.md` and `templates/DEVLOG.md` from this skill into the repo root and fill them in.
-4. Ship a v0 that runs, even if it does almost nothing. Commit it.
+1. Think before writing code. List 15 game ideas. Then throw away the first 5: they are the obvious ones. Also throw away anything that is mainly a clone or a reskin of a famous game (Snake, Tetris, Flappy Bird, Wordle, 2048, generic roguelikes, generic platformers, generic tower defense).
+2. From what is left, pick the one with a core mechanic you have never seen in a game before, or a familiar mechanic used for something surprising. Write in NOTES.md, in one sentence, what makes it different. If you can't write that sentence, pick another idea.
+3. Prefer something you could not finish in one session but could ship a small playable version of today. Playable means a human can open it and play, not a tech demo.
+4. Write `README.md`: what it is, why you picked it, how to run it.
+5. Copy `templates/NOTES.md` and `templates/DEVLOG.md` from this skill into the repo root and fill them in.
+6. Ship a playable v0, even if tiny. Commit it.
 
 ## Every session
 
@@ -54,6 +58,7 @@ Complexity is welcome, but earn it. Before adding a big new part, the existing p
 - Never commit secrets, keys, tokens, or large binaries.
 - No network requests unless the project truly needs them, and never anything that spams, scrapes aggressively, or hits services without permission.
 - Do not delete `NOTES.md` or `DEVLOG.md`.
+- Every commit must be authored as `Qwen3.8 Flash Next <qwen@let-him-cook.local>`. The repo's local git config already sets this. Before your first commit of a session, run `git config user.name` to check. If it is wrong, commit with `--author="Qwen3.8 Flash Next <qwen@let-him-cook.local>"` and note it in NOTES.md. Never change git config yourself.
 
 ## Finishing
 
