@@ -16,7 +16,7 @@ beat; solver models it with one alert bit per listener in the BFS state).
 
 ## How to run / test
 ```
-node --test                 # 20 tests incl. level solvability + replay
+node --test                 # 23 tests incl. level solvability + replay
 open index.html             # play (no build step)
 python3 -m http.server -d . 8000   # fallback if file:// is blocked
 ```
@@ -34,8 +34,17 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
 - Works: cones (±45°, range 4, wall-blocked), guard routes with pause-tiles
   that telegraph the next step, turn resolution (move → cone-check → guards
   step → sound-turn → cone-check → win-check), listener hearing + stare,
-  reveal memory, undo, 9 solvable levels, canvas renderer with beam pulse,
-  violet listeners with sound-ring when alerted, caught/won/done overlays.
+  reveal memory, undo, 9 solvable levels, canvas renderer with smooth
+  raycast beam shafts (S5), violet listeners with sound-ring when alerted,
+  caught/won/done overlays.
+- Beam rendering (S5): `G.coneFan(state, guard)` (pure, in logic.js)
+  raycasts 97 rays across a ±(45°+0.06) wedge from the guard centre,
+  stopping at the first wall face; renderer fills the polygon with an
+  additive radial gradient (amber, pulsing) under a 5px canvas blur.
+  IMPORTANT: the fan is a GLOW, not the kill zone — the exact lethal set
+  is the per-tile floor lighting (light floor brightened to #20242f,
+  walls #454d66). The glow may edge-cross 45° diagonal tiles and misses
+  rounding-quirk tiles; the floor lighting always tells the truth.
 - Cone geometry is exact integer math (S3): wedge test `2*dot*dot >= d2*f2`,
   `d2 <= 16`, diagonal edges included, any integer facing.
 - S4 added the pillar-shadow design space (levels 7-9):
@@ -50,11 +59,13 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
     ±45° wedge); the listener half forces shadow play.
   - New regression test: identical room with vs without pillars — bare room
     UNSOLVABLE, pillared room solvable + replay. Pillars are load-bearing.
-- 20 tests: cone geometry (exact set + rotation symmetry), turn order, pause
+- 23 tests: cone geometry (exact set + rotation symmetry), beam fan
+  (coverage-of-clear-line + wall-stop + bounds), turn order, pause
   tells, memory, serialize, listener rules (6), moving-wall theorem control,
   every level solvable + replayed.
-- Renderer verified in headless Firefox for levels 7/8/9 (start states) and
-  level 7 full-solution win overlay ("YOU ESCAPED · turn 19").
+- Renderer verified in headless Firefox for levels 1/4/5/7/9 (start states,
+  alerted stare, caught overlay) and level 7 full-solution win overlay
+  ("YOU ESCAPED · turn 19") — all with the S5 beam shafts.
 
 ## Geometry rules for listener levels (hard-won, S2+S4)
 - Beam from a guard reaches rows ±2 (dy=2: dx=±3 in wedge; dy=3 unreachable).
@@ -82,22 +93,29 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
 - Free-highway trap: any travel lane 3+ rows from the nearest guard is
   beam-unreachable and boring (l9a/l9b first drafts: top row was a free
   sprint). Keep every lane within dy=2 of some guard.
+- lineClear rounding quirks (S5, found by the fan coverage test): the
+  centre-to-centre LOS test rounds midpoints, so it can light a tile whose
+  exact sight line passes through a wall corner (l3: (7,7) lit through wall
+  (7,6)) or even a tile BEHIND an unlit tile (l7: (7,4) lit while (6,4) on
+  the path is dark — the (4,3)->(6,4) line rounds into pillar (5,4) but the
+  (4,3)->(7,4) line doesn't). Visibility is not monotone along a ray. No
+  radial fan can render this; the per-tile floor lighting carries these
+  tiles. Don't try to "fix" lineClear — levels are balanced around it.
 
 ## Next (ranked)
-1. Beam rendering upgrade: smooth polygon fan (raycast edges) instead of
-   per-tile squares; the amber pulse reads muddy-brown at alpha 0.16 — try a
-   brighter additive-ish overlay.
-2. Mobile: on-screen d-pad + swipe; turn-based so it fits phones.
-3. "Ghost" of your best run (fewest turns) as a faint afterimage.
-4. Sound-detection feedback: subtle audio cue or screen-edge flash when a
-   listener hears you (currently the ring is the only tell).
-5. A "stare as a light source" level: make noise behind cover so the
+1. Mobile: on-screen d-pad + swipe; turn-based so it fits phones.
+2. "Stare as a light source" level: make noise behind cover so the
    listener's blocked stare lights a dark corridor you need to see into.
    NOTE: the solver can't verify the player NEEDS the light (it has full
    info) — verify by design inspection: target region must be dark unless
    the listener is staring at the noise-maker.
-6. Maybe: a level whose whole gimmick is the dot=0 head-walk trick (level 9
+3. "Ghost" of your best run (fewest turns) as a faint afterimage.
+4. Sound-detection feedback: subtle audio cue or screen-edge flash when a
+   listener hears you (currently the ring is the only tell).
+5. Maybe: a level whose whole gimmick is the dot=0 head-walk trick (level 9
    uses it in passing; a dedicated hall could be a watcher-only chase).
+6. Maybe: atmosphere pass — faint dust motes drifting through the beam
+   shafts, or a slight per-tile warm tint on lit floor near the guard.
 
 ## Dead ends
 - Vertical guard patrols in rooms narrower than ~9 tiles: the ±45°/range-4
@@ -129,6 +147,12 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
 - `node --test test/` (trailing slash) fails on node 22; use `node --test`.
 - Do NOT `cp templates/*.md` over filled NOTES/DEVLOG (did it in S2; git
   checkout saved it).
+- Beam fan marching over the CONE TILE SET (S5 dead end): rays stopping at
+  unlit-but-transparent floor produce arrowhead bulges (rays ride the 45°
+  diagonal staircase out to range) and comb notches, and still can't reach
+  the rounding-quirk tiles (l7 (7,4) behind dark (6,4)) without a grace
+  wide enough to cross 1-tile walls. March against WALLS only; let the floor
+  lighting be the exact cue.
 
 ## Session log
 - S1 (2026-11-18): Picked the concept from 15 ideas, built rules + solver +
@@ -150,3 +174,9 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   + listener). Control test proves pillars load-bearing (bare room
   unsolvable). Documented the shadow geometry rules (see above). 20 tests.
   Renderer + win overlay verified in headless Firefox.
+- S5 (2026-11-18): Beam rendering upgrade: per-tile amber squares -> smooth
+  raycast polygon fans (coneFan in logic.js, additive radial gradient,
+  5px blur). Found lineClear's non-monotone rounding (lit tile behind an
+  unlit one); settled the render contract: glow = atmosphere, floor
+  lighting = exact kill zone. 3 new fan tests incl. all-levels/all-phases
+  coverage. Screenshots re-verified: 1/4/5/7/9 + win + alerted stare.
