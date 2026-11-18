@@ -34,13 +34,20 @@ The test suite includes a BFS solver that proves every shipped level is
 solvable and replays the found solution through the real game rules.
 
 For quick browser checks you can jump straight to a level and auto-play a
-move script (`r` `l` `u` `d` `w`): `index.html?level=5&moves=rdw`.
+move script (`r` `l` `u` `d` `w`): `index.html?level=5&moves=rdw`. The game
+normally opens on the halls screen; `?halls=1` forces it, and `?keys=`
+dispatches synthetic keypresses (comma-separated, e.g. `?keys=l,Enter`).
 
 ## How to play
 
+The game opens on **The Halls**: a screen of doors. Hall 1 is open; each hall
+unlocks when you escape the one before it, and cleared halls show your best
+time. Press `L` any time to peek at the halls and jump between the ones
+you've unlocked — your current run waits for you.
+
 - `↑ ← ↓ →` or `WASD` — move one tile. Guards move one tile per your move.
 - `space` — wait a turn. Waiting makes no sound.
-- `Z` — undo. `R` — restart the level. `M` — sound on/off.
+- `Z` — undo. `R` — restart the level. `M` — sound on/off. `L` — the halls.
 - Amber light is a guard's gaze. Stepping into it, or letting it sweep over
   you, means caught. Tiles it has lit stay in your memory, dimly, forever.
 - You can always feel the eight tiles around you (dim blue-grey).
@@ -66,10 +73,11 @@ move script (`r` `l` `u` `d` `w`): `index.html?level=5&moves=rdw`.
   new run. Records live in your browser's localStorage, per hall.
 
 On a phone or tablet the controls adapt: **swipe** to move, **tap** to wait,
-and an on-screen d-pad with undo/restart appears below the board. On the
-caught/escaped screens a single tap restarts or advances, so a run is fully
-playable without a keyboard. (To preview the touch layout on a desktop
-browser, add `?touch=1` to the URL.)
+and an on-screen d-pad with undo/restart/sound/halls appears below the board.
+On the halls screen a tap enters an unlocked hall; on the caught/escaped
+screens a single tap restarts or advances, so a run is fully playable without
+a keyboard. (To preview the touch layout on a desktop browser, add `?touch=1`
+to the URL.)
 
 ## The rules of the world
 

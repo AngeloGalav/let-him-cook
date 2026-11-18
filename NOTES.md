@@ -18,11 +18,13 @@ ring exists and the stare can be farmed as a flashlight (see geometry below).
 S8 added the ghost: your fastest escape per level is stored in localStorage
 and replays as a faint afterimage pacing you through the run. S9 added
 heard-feedback: when a listener hears your move you get ripples + a ring +
-a low thud (see below).
+a low thud (see below). S10 added The Halls: the game opens on a level-select
+screen (cards per level, best times, lock ladder: level i opens once i-1 is
+cleared); `L` peeks at it mid-run without losing state.
 
 ## How to run / test
 ```
-node --test                 # 36 tests incl. level solvability + replay + ghost
+node --test                 # 38 tests incl. level solvability + replay + ghost
 open index.html             # play (no build step)
 python3 -m http.server -d . 8000   # fallback if file:// is blocked
 ```
@@ -31,8 +33,11 @@ Headless screenshot verification (works, used every session):
 firefox --profile /tmp/ffprofile -no-remote --screenshot /tmp/x.png \
   --window-size 900,820 'file:///.../index.html?level=5&moves=dd'
 ```
-URL hooks in main.js: `?level=N` (1-based), `?moves=rlduw...` auto-played,
-`?touch=1` forces the touch UI (d-pad + touch help) on a desktop browser.
+URL hooks in main.js: `?level=N` (1-based, bypasses the lock ladder),
+`?moves=rlduw...` auto-played, `?touch=1` forces the touch UI (d-pad + touch
+help) on a desktop browser, `?halls=1` forces the halls screen, `?keys=a,b,c`
+dispatches synthetic keydowns after load (comma-separated so `Enter` works;
+used to verify the halls keyboard router headless).
 Use a dedicated profile — the user's Firefox is usually running. The profile
 must exist first (mkdir it) and its localStorage persists across runs: win a
 level in one screenshot run, reload in the next to verify stateful features
@@ -114,14 +119,30 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   created lazily and only after a real gesture (userGestured flag in
   keydown/touchstart/pointerdown) so autoplay policy is never fought and
   headless ?moves= runs stay silent.
-- 36 tests: cone geometry (exact set + rotation symmetry), beam fan
+- Halls screen (S10): main.js has a `screen` state ('game' | 'halls'); the
+  game opens on halls unless `?level=`/`?moves=` is present. Cards are laid
+  out by `hallCards()` (2 columns, 648×500 logical canvas; fitCanvas now
+  takes the logical size and `logicalSize()` routes resize). Lock ladder is
+  pure logic.js: `unlockedLevels(cleared, count)` (level i open iff i==0 or
+  cleared[i-1]) and `firstOpenLevel` (cursor parks on the first open
+  uncleared). Cleared == a ghost best exists; `bestAt(i)` caches the 10
+  localStorage reads, invalidated by saveBest and openHalls. Input: L
+  toggles (mid-run peek: openHalls/closeHalls never touch `game`, so the run
+  resumes untouched; at startup there is nothing to return to and Esc/L is a
+  no-op); in halls mode wasd/arrows move the cursor (rows are 2 wide), Enter
+  enters an unlocked card, click/tap hit-tests via `canvasPoint` (client px →
+  logical px through the fitCanvas scale) + `cardAt`. The d-pad gained a
+  'halls' button (toggle). allDone tap/L now goes to halls, not level 1.
+  Locked cards show "N · locked" — names of unseen halls are not spoiled.
+- 38 tests: cone geometry (exact set + rotation symmetry), beam fan
   (coverage-of-clear-line + wall-stop + bounds), turn order, pause
   tells, memory, serialize, listener rules (6), moving-wall theorem control,
   every level solvable + replayed, classifySwipe (2), black-hall design
   properties (3), ghost (5: encode round-trip, strict decode, isBetterRun,
   replay-of-solver-solution on all 10 levels, bump-free path steps), heard
   feedback (3: anyAlerted timing incl. wait-clears + out-of-earshot, watcher
-  never alerts, undo round-trip).
+  never alerts, undo round-trip), halls ladder (2: unlockedLevels rung-by-
+  rung + short-array padding, firstOpenLevel incl. all-cleared -> 0).
 - Renderer verified in headless Firefox for levels 1/4/5/7/9 (start states,
   alerted stare, caught overlay) and level 7 full-solution win overlay
   ("YOU ESCAPED · turn 19") — all with the S5 beam shafts. S6 re-verified
@@ -135,6 +156,13 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
    column + alert ring on guard + new violet ring on the player (heard but
    unseen); level 10 start and level 1 are ring-free; touch 390px layout
    fits the new sound button. Audio itself NOT verifiable headless.
+   S10 verified the halls screen on a FRESH profile (only hall 1 open,
+   cursor parked on it), then after a level-1 win: best 9 + hall 2 open +
+   cursor auto-parked on 2; mid-run L shows the "returns to your run"
+   footer; wasd cursor moves; Enter enters an unlocked card (level 2
+   loads) and is a no-op on a locked one; L,L returns to the game refit;
+   touch 390px fits the halls grid + new d-pad button. Click/tap hit-test
+   math is code-reviewed only (no headless way to click).
 
 ## Geometry rules for listener levels (hard-won, S2+S4)
 - Beam from a guard reaches rows ±2 (dy=2: dx=±3 in wedge; dy=3 unreachable).
@@ -196,8 +224,8 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
    24px swipe threshold and d-pad reach with a thumb; also consider
    long-press repeat on the d-pad.
 5. Maybe: ghost polish — a small "ahead/behind" cue (the ghost always draws
-   even when slower; could dim it when behind), or surface best times on a
-   level-select screen (none exists yet).
+   even when slower; could dim it when behind). The level-select half of this
+   landed in S10 (halls screen shows best times).
 6. Maybe: audio expansion — the heard-thud is the game's only sound. A soft
    heartbeat that fades in while a listener is within earshot (before you
    move) would close the loop: it warns you *where* silence is required.
@@ -298,3 +326,14 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   gesture-gated so autoplay policy and headless runs stay clean. 3 tests ->
   36. Headless-verified on level 10's heard-but-unseen beat; level 1/10
   starts ring-free; touch layout fits the new button.
+- S10 (2026-11-18): The Halls — level select with a lock ladder and best
+  times. The game now opens on a hub screen (cards per hall, ghost bests,
+  hall i opens once i-1 is escaped); L peeks at it mid-run without touching
+  game state; wasd/Enter/click/tap all navigate it; d-pad gained a halls
+  button. Lock logic is pure (unlockedLevels/firstOpenLevel) + 2 tests -> 38.
+  fitCanvas generalized to logical sizes so the hub has its own canvas size.
+  Added a ?keys= synthetic-keydown hook to make the keyboard router
+  screenshot-verifiable headless (this also caught that the cursor parks on
+  the next uncleared hall, not on 1 — by-design, now pinned). Headless-
+  verified: fresh-profile ladder, post-win best display, mid-run peek,
+  Enter on unlocked/locked cards, L,L round-trip, 390px touch layout.
