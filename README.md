@@ -74,6 +74,9 @@ you've unlocked — your current run waits for you.
   afterimage replaying your best run one turn at a time, trail and all. It
   paces you through the dark; beat its turn count and the ghost becomes your
   new run. Records live in your browser's localStorage, per hall.
+- Clear **all thirteen** and the hub itself changes: The Halls lights up —
+  every door glows amber and your total turn count is named. The dark you
+  moved through is gone; that is the ending.
 
 On a phone or tablet the controls adapt: **swipe** to move, **tap** to wait,
 and an on-screen d-pad with undo/restart/sound/halls appears below the board.

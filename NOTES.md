@@ -33,11 +33,14 @@ the open dies to its own stare, so each bell tile is a heard-but-pillar-blocked
 pocket of the OTHER guard's beam, and the crossing step onto the row-3 bell
 tile IS the ring (see geometry). S14 added the heartbeat: standing inside a
 listener's earshot now plays a soft lub-dub whose rate and volume scale with
-proximity — the first cue that warns BEFORE you move (see State).
+proximity — the first cue that warns BEFORE you move (see State). S15 added
+the epilogue: once every hall has a best run, the Halls hub itself lights up
+— warm wash, amber cards, and "every hall lit · N turns in all" (sum of all
+bests; the final overlay carries the same total) (see State).
 
 ## How to run / test
 ```
-node --test                 # 55 tests incl. level solvability + replay + ghost
+node --test                 # 57 tests incl. level solvability + replay + ghost + epilogue
 open index.html             # play (no build step)
 python3 -m http.server -d . 8000   # fallback if file:// is blocked
 ```
@@ -158,6 +161,18 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   logical px through the fitCanvas scale) + `cardAt`. The d-pad gained a
   'halls' button (toggle). allDone tap/L now goes to halls, not level 1.
   Locked cards show "N · locked" — names of unseen halls are not spoiled.
+- Epilogue (S15): logic.js `allCleared(cleared, count)` (every entry true;
+  short arrays and count 0 are NOT all-cleared) and `totalBestTurns(bests)`
+  (sum of turns, but null unless EVERY entry has a numeric turns — the line
+  can never undercount a partial run). main.js: `drawHalls` checks
+  allCleared(clearedFlags()) each frame; when lit it paints a warm linear
+  wash (amber .07→.015 top-to-bottom), fills cards warm (#150f06, cursor
+  #1c1508) with amber borders (cursor keeps the cyan pulse), and draws
+  "every hall lit · N turns in all" in amber above the footer; hallsH()
+  adds 26px of margin for that line only when lit. The allDone overlay shows
+  the same total on its own line (a single 60-char line was clipped by the
+  504px canvas — split in two). bestAt's cache is invalidated by saveBest,
+  so the total is live the moment hall 13 lands.
 - Lighthouse (S11): level 11, two h4 listeners on perpendicular streets —
   A patrols the top row (cols 3-13), B the left column (rows 2-6); pillars
   at row 3 cols 2,5,8,11. The hall (rows 4-5 x cols 6-13) is dark in all 63
@@ -206,7 +221,7 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   the (4,4),(4,5) leak that also rings B), the exit tease beats, and the
   exit-step window. KNOWN GAP: the exit-revealing Bell A ring is geometrically
   pinned but unreachable in a live run (see Dead ends).
-- 55 tests: cone geometry (exact set + rotation symmetry), beam fan
+- 57 tests: cone geometry (exact set + rotation symmetry), beam fan
   (coverage-of-clear-line + wall-stop + bounds), turn order, pause
   tells, memory, serialize, listener rules (6), moving-wall theorem control,
   every level solvable + replayed, classifySwipe (2), black-hall design
@@ -224,7 +239,10 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   leak, exit never lit by the watcher + tease pinned to t∈{1,5,6,7}, exit
   step survivable only at t∈{9..12}), earshot (4: watcher + outside -> 0 and
 edge > 0, monotone toward the listener inside the zone, tile-for-tile
-agreement with hears incl. through a wall, nearest-of-two-listeners wins).
+agreement with hears incl. through a wall, nearest-of-two-listeners wins),
+epilogue (2: allCleared flips only when every hall has a best incl.
+short-array + count-0 guards, totalBestTurns sums full sets and refuses
+partial/empty ones).
 - Renderer verified in headless Firefox for levels 1/4/5/7/9 (start states,
   alerted stare, caught overlay) and level 7 full-solution win overlay
   ("YOU ESCAPED · turn 19") — all with the S5 beam shafts. S6 re-verified
@@ -260,6 +278,13 @@ agreement with hears incl. through a wall, nearest-of-two-listeners wins).
    turns east at its south end, violet ripple on the player, exit arch
    remembered from the beam graze), a both-bells route replay win ("YOU
    ESCAPED · turn 24 · new best"), and the 13-card halls grid (7 rows).
+   S15 verified the epilogue end-to-end: won ALL 13 halls headless into the
+   persistent profile (solver win-strings via the node -e one-liner), then
+   screenshotted the lit hub (all cards amber + bests, "every hall lit ·
+   311 turns in all" — 311 = the solver sum), the YOU HAVE THEIR EYES
+   overlay with the total split over two lines (first draft was clipped by
+   the 504px canvas), the 390px touch epilogue hub, and the pre-epilogue
+   hub (partial bests) unchanged.
 
 ## Geometry rules for listener levels (hard-won, S2+S4)
 - Beam from a guard reaches rows ±2 (dy=2: dx=±3 in wedge; dy=3 unreachable).
@@ -372,10 +397,11 @@ agreement with hears incl. through a wall, nearest-of-two-listeners wins).
 4. Maybe: real-device touch pass — if a phone is ever available, check the
    24px swipe threshold and d-pad reach with a thumb; also consider
    long-press repeat on the d-pad.
-5. Maybe: decide whether the game is DONE — thirteen halls, every mechanic
-   represented, hub + ghost + mobile + audio (thud + heartbeat) all verified.
-   If a next session has no burning idea, polish README, write the final
-   devlog, set DONE.
+5. Decide whether the game is DONE — thirteen halls, every mechanic
+   represented, hub + ghost + mobile + audio (thud + heartbeat) + the
+   epilogue all verified. The game now has a real ending; if a next session
+   has no burning idea, that IS the sign: polish README, write the final
+   devlog, set DONE. (S15's honest read: nothing on this list burns.)
 
 ## Dead ends
 - Vertical guard patrols in rooms narrower than ~9 tiles: the ±45°/range-4
@@ -570,3 +596,16 @@ agreement with hears incl. through a wall, nearest-of-two-listeners wins).
   asserted monotonic rise starting outside the zone where the value is pinned
   at 0 (0 > 0). 4 tests -> 55. Headless-verified l1/l10 render unchanged
   (audio itself needs ears).
+- S15 (2026-11-18): The epilogue — the hub lights up when every hall is
+  cleared. The game had a final overlay but the Halls screen never changed,
+  so the run ended and the room forgot it. Now: warm wash, amber card
+  borders, and "every hall lit · N turns in all" (sum of every best time;
+  totalBestTurns returns null unless every hall has a best, so it can never
+  undercount). Two pure logic functions + 4 tests -> 57. Verification was
+  the feature: generated solver win-strings for all 13 halls, ran 13
+  headless Firefox wins into the persistent profile, then screenshotted the
+  lit hub (311 turns — matches the solver sum), the final overlay, and the
+  390px touch layout; the pre-epilogue hub is unchanged. One catch from the
+  screenshots: the overlay's single 60-char total line overflowed the 504px
+  canvas and lost words at both edges — split into two lines. Next list is
+  now polish + one known wart; the DONE question is #5 and nothing burns.
