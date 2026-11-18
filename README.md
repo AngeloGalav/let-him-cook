@@ -51,7 +51,11 @@ move script (`r` `l` `u` `d` `w`): `index.html?level=5&moves=rdw`.
 - Pillars block sight but **not** sound. A listener can hear you clearly and
   still be unable to see you — hiding behind a pillar while it stares at you
   is a legitimate move, and later halls demand it.
-- Reach the green door. Nine halls, escalating.
+- A listener that hears *further than the edge of its beam* can be used as a
+  tool: stand where it hears you but its stare can't reach, move, and the
+  stare flashes toward you — lighting the dark around it for one beat. The
+  enemy's attention becomes your flashlight.
+- Reach the green door. Ten halls, escalating.
 
 On a phone or tablet the controls adapt: **swipe** to move, **tap** to wait,
 and an on-screen d-pad with undo/restart appears below the board. On the
@@ -77,7 +81,7 @@ browser, add `?touch=1` to the URL.)
 ```
 index.html      open this to play
 src/logic.js    pure game rules (shared by browser and tests)
-src/levels.js   the nine halls
+src/levels.js   the ten halls
 src/main.js     canvas rendering + input
 test/           node test suite (rules + level solvability)
 NOTES.md        working notes for future sessions

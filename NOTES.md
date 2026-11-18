@@ -12,11 +12,13 @@ is canvas rendering + input; `src/levels.js` holds 9 hand-made levels. A BFS
 solver in logic.js proves levels solvable and the test suite replays solutions
 through the real rules. Two guard types: watcher (cone only) and listener
 (hears moves within N tiles through walls, snaps to face the sound for one
-beat; solver models it with one alert bit per listener in the BFS state).
+beat; solver models it with one alert bit per listener in the BFS state). Level 10
+adds the inverted listener: hearing 4 = sight range, so a heard-but-unseen
+ring exists and the stare can be farmed as a flashlight (see geometry below).
 
 ## How to run / test
 ```
-node --test                 # 25 tests incl. level solvability + replay
+node --test                 # 28 tests incl. level solvability + replay
 open index.html             # play (no build step)
 python3 -m http.server -d . 8000   # fallback if file:// is blocked
 ```
@@ -35,7 +37,7 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
 - Works: cones (±45°, range 4, wall-blocked), guard routes with pause-tiles
   that telegraph the next step, turn resolution (move → cone-check → guards
   step → sound-turn → cone-check → win-check), listener hearing + stare,
-  reveal memory, undo, 9 solvable levels, canvas renderer with smooth
+  reveal memory, undo, 10 solvable levels, canvas renderer with smooth
   raycast beam shafts (S5), violet listeners with sound-ring when alerted,
   caught/won/done overlays.
 - Mobile (S6): canvas scales to viewport width (backing store = display px ×
@@ -68,15 +70,33 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
     ±45° wedge); the listener half forces shadow play.
   - New regression test: identical room with vs without pillars — bare room
     UNSOLVABLE, pillared room solvable + replay. Pillars are load-bearing.
-- 25 tests: cone geometry (exact set + rotation symmetry), beam fan
+- S7 added level 10 "The Black Hall" (stare-as-light-source):
+  - Listener with HEARING 4 (== sight range) patrols the top street; the
+    hall (rows 4-5) is dark in every patrol phase; exit at (13,4) is only
+    ever lit by a lured south stare from street columns 11-13.
+  - The trigger: stand on the bottom row at lateral 1-3 from the guard,
+    move -> heard -> south stare -> beam falls down the GUARD's column
+    (never the player's) -> hall + exit light for one beat and are
+    remembered forever. Lateral 0 = death (trap and tool are one tile).
+  - A screen wall at column 7 (rows 4-5) blocks the dark lane and forces
+    one timed crossing of the lit buffer row 3 (or riding the dot=0 notch
+    directly above the guard's head).
+  - Solver wins in 20 turns WITHOUT the gimmick (beam-trail route via row
+    3) — accepted: the dark route is the one that reveals the exit early;
+    soft-necessity design, pinned by 3 design-inspection tests -> 28.
+- 28 tests: cone geometry (exact set + rotation symmetry), beam fan
   (coverage-of-clear-line + wall-stop + bounds), turn order, pause
   tells, memory, serialize, listener rules (6), moving-wall theorem control,
-  every level solvable + replayed, classifySwipe (2).
+  every level solvable + replayed, classifySwipe (2), black-hall design
+  properties (3: hall dark in patrol, heard-but-unseen ring, exit only
+  stare-lit).
 - Renderer verified in headless Firefox for levels 1/4/5/7/9 (start states,
   alerted stare, caught overlay) and level 7 full-solution win overlay
   ("YOU ESCAPED · turn 19") — all with the S5 beam shafts. S6 re-verified
   level 1 desktop (start + win) unchanged, and phone 390×844 (start/win/caught)
-  with the d-pad and touch help.
+  with the d-pad and touch help. S7 verified level 10: start, first-move flash
+  (stare down the column), exit-reveal moment (moves=rlrrrrruurrrdd), and the
+  solver replay win ("YOU ESCAPED · turn 20").
 
 ## Geometry rules for listener levels (hard-won, S2+S4)
 - Beam from a guard reaches rows ±2 (dy=2: dx=±3 in wedge; dy=3 unreachable).
@@ -112,18 +132,32 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   (4,3)->(7,4) line doesn't). Visibility is not monotone along a ray. No
   radial fan can render this; the per-tile floor lighting carries these
   tiles. Don't try to "fix" lineClear — levels are balanced around it.
+- Stare-flash geometry (S7): the cone is a QUARTER-DISC (d2 <= 16 dominates
+  the wedge at long range): a cardinal stare at distance 4 lights exactly
+  ONE tile at that depth (straight ahead); the widest row is dy=2/3 at
+  |dx| <= 2. A "flash" is a finger, not a floodlight — design dark areas
+  ~5 wide or reveal them column-by-column, never expect one stare to light
+  a room. Patrol beam reaches dy=2 only, and with a dot=0 notch: the tiles
+  directly above/below a patrolling guard are DARK (level 9's head-walk).
+- Heard-but-unseen ring (S7): with hearing == CONE_RADIUS (4), the tiles at
+  Chebyshev 4 that fail d2 <= 16 (e.g. lateral 1-3 on a row 4 below) are
+  heard-but-unstabbable: the listener turns toward you and CANNOT reach you.
+  Lateral 0 at dy=4 is d2=16 -> lethal. This inverts the listener from
+  threat to tool and is level 10's core.
 
 ## Next (ranked)
-1. "Stare as a light source" level: make noise behind cover so the
-   listener's blocked stare lights a dark corridor you need to see into.
-   NOTE: the solver can't verify the player NEEDS the light (it has full
-   info) — verify by design inspection: target region must be dark unless
-   the listener is staring at the noise-maker.
-2. "Ghost" of your best run (fewest turns) as a faint afterimage.
-3. Sound-detection feedback: subtle audio cue or screen-edge flash when a
-   listener hears you (currently the ring is the only tell).
+1. "Ghost" of your best run (fewest turns) as a faint afterimage.
+2. Sound-detection feedback: subtle audio cue or screen-edge flash when a
+   listener hears you (currently the ring is the only tell). With level 10's
+   flash gimmick the "you were heard" moment deserves a stronger cue — the
+   reveal beat IS the feedback, but a silent lateral-4 move that produces no
+   flash is hard to read.
+3. Maybe: a second flash hall that forces the gimmick — e.g. the exit sits
+   where only a flash from a specific far corner reaches it, or two h4
+   listeners where one's stare lights the other's blind spot.
 4. Maybe: a level whose whole gimmick is the dot=0 head-walk trick (level 9
-   uses it in passing; a dedicated hall could be a watcher-only chase).
+   uses it in passing; level 10's row-3 notch ride exposes it; a dedicated
+   watcher-only chase hall could make the notch the main road).
 5. Maybe: atmosphere pass — faint dust motes drifting through the beam
    shafts, or a slight per-tile warm tint on lit floor near the guard.
 6. Maybe: real-device touch pass — if a phone is ever available, check the
@@ -151,7 +185,10 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   h2 leaves the gap silent when both are at far ends; that's level 8.
 - "Noise as a beam-aiming tool" is weak under current rules: a stare that
   reaches you kills you, and a blocked stare only lights tiles near the
-  pillar. A level built on it needs the Next-5 design.
+  pillar. RESOLVED in S7 by a different mechanism: not a blocked stare but
+  an UNBLOCKED one aimed at a noise-maker standing out of the blob's reach
+  (hearing 4 > effective diagonal sight) — that's level 10. The blocked-
+  stare variant stays dead: light never passes a blocker.
 - S2's note "diagonal k=3 is in the cone" was WRONG (see S3 note in git
   history): range check excluded (3,3)/(4,4); the S3 fix only added the
   45° tiles at distance 1-2.
@@ -199,3 +236,9 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   help and overlay wording (tap to restart / next). Tap-on-canvas resolves
   end-of-run overlays so runs are keyboard-free. Verified headless: desktop
   start/win unchanged, phone 390x844 start/win/caught with d-pad.
+- S7 (2026-11-18): Level 10 "The Black Hall" — stare as a light source.
+  Killed the blocked-stare variant by probe (light never passes a blocker);
+  rebuilt around hearing 4 == sight range: a heard-but-unseen ring lets you
+  bait the stare into lighting the dark hall, trap tile (directly beneath)
+  one tile from the tool tile. Documented quarter-disc flash geometry.
+  3 design-inspection tests -> 28. Headless-verified start/flash/reveal/win.
