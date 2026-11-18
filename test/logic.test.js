@@ -706,6 +706,107 @@ test('lighthouse: (5,5) is a blind spot only the OTHER guard can light', () => {
   );
 });
 
+// ---------- level 12: The Wake (the beam is a moving wall; the wake is the road) ----------
+//
+// Two watchers patrol two 5-row streets. A ±45°/range-4 beam fills a 5-row
+// street wall to wall two columns ahead of its guard, so a street can never
+// be crossed in front of the beam — the only dark road on a swept street is
+// the guard's own wake (coneOf skips dot<0, so the whole rear half-plane is
+// dark). The U-shaped hall chains two rides: ride the lower guard west,
+// hide in the left well while the return sweep passes, ride the upper guard
+// east, and dive the exit the beat after its turn. The solver proves the
+// ride exists; these tests pin that there is nothing but the ride.
+
+const wake = LEVELS.find(l => l.name.indexOf('Wake') >= 0);
+
+test('wake: two watchers; every street is swept wall to wall', () => {
+  assert.ok(wake, 'level 12 exists');
+  for (const g of wake.guards) {
+    assert.notStrictEqual(g.type, 'listener', 'wake riding needs watchers (a listener hears the rider)');
+  }
+  const st = G.createGame(wake);
+  const cycle = G.cycleLength(wake);
+  for (let t = 0; t < cycle; t++) {
+    for (let gi = 0; gi < 2; gi++) {
+      const gp = G.guardAt(wake, gi, t);
+      const cone = G.coneOf(st, gp);
+      const has = (x, y) => cone.some(c => c.x === x && c.y === y);
+      // the two columns directly ahead are lit across the full street width:
+      // the beam is a full-width wall, there is no gap to slip through
+      for (const dx of [2, 3]) {
+        for (let dy = -2; dy <= 2; dy++) {
+          const x = gp.x + gp.facing.x * dx, y = gp.y + dy;
+          if (G.isWall(st, x, y)) continue;
+          assert.ok(has(x, y),
+            'phase ' + t + ' guard ' + gi + ': gap in the wall at ' + x + ',' + y);
+        }
+      }
+    }
+  }
+});
+
+test('wake: the wake is a road — the rear half-plane of each guard is dark', () => {
+  const st = G.createGame(wake);
+  const cycle = G.cycleLength(wake);
+  for (let t = 0; t < cycle; t++) {
+    for (let gi = 0; gi < 2; gi++) {
+      const gp = G.guardAt(wake, gi, t);
+      const cone = G.coneOf(st, gp);
+      const has = (x, y) => cone.some(c => c.x === x && c.y === y);
+      for (let k = 1; k <= 4; k++) {
+        for (let dy = -2; dy <= 2; dy++) {
+          const x = gp.x - gp.facing.x * k, y = gp.y + dy;
+          if (G.isWall(st, x, y)) continue;
+          assert.ok(!has(x, y),
+            'phase ' + t + ' guard ' + gi + ': wake lit at ' + x + ',' + y);
+        }
+      }
+    }
+  }
+});
+
+test('wake: the exit is a flip gate — lit on approach, dark only after the turn', () => {
+  const st = G.createGame(wake);
+  // Upper guard A = ping(2,3,12,3,1): t8 (10,3) east, t9 (11,3) east,
+  // t10-11 (12,3) west. The exit (12,2) and the rider's survival tile
+  // (12,4) sit in the dot=0 column: lethal all the way up, safe only once
+  // the guard has arrived and turned.
+  for (const t of [8, 9]) {
+    const gp = G.guardAt(wake, 0, t);
+    assert.strictEqual(gp.facing.x, 1, 'guard approaches facing east at t' + t);
+    assert.ok(G.coneOf(st, gp).some(c => c.x === 12 && c.y === 2),
+      'exit lit on approach at t' + t);
+  }
+  for (const t of [10, 11]) {
+    const gp = G.guardAt(wake, 0, t);
+    assert.strictEqual(gp.facing.x, -1, 'guard has turned at t' + t);
+    assert.ok(!G.coneOf(st, gp).some(c => c.x === 12 && c.y === 2),
+      'exit dark after the turn at t' + t);
+    assert.ok(!G.coneOf(st, gp).some(c => c.x === 12 && c.y === 4),
+      'rider tile below the guard dark after the turn at t' + t);
+  }
+});
+
+test('wake: the well core is never lit — a pure waiting room between streets', () => {
+  const st = G.createGame(wake);
+  const cycle = G.cycleLength(wake);
+  for (let t = 0; t < cycle; t++) {
+    for (let gi = 0; gi < 2; gi++) {
+      for (const [x, y] of [[1, 6], [2, 6]]) {
+        assert.ok(!G.coneOf(st, G.guardAt(wake, gi, t)).some(c => c.x === x && c.y === y),
+          'phase ' + t + ' guard ' + gi + ': well tile ' + x + ',' + y + ' lit');
+      }
+    }
+  }
+});
+
+test('wake: the escape is a long ride — no shortcut exists', () => {
+  const sol = G.solve(wake);
+  assert.ok(sol, 'level 12 solvable');
+  assert.ok(sol.length >= 30,
+    'the shortest escape must be a multi-leg ride (solver found ' + sol.length + ')');
+});
+
 // ---------- ghost: best-run recording ----------
 
 test('ghost: encodeRun/decodeRun round-trip', () => {

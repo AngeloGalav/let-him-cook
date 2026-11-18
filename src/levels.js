@@ -231,6 +231,29 @@
         { route: ping(3, 1, 13, 1, 1), type: 'listener', hearing: 4 },
         { route: ping(1, 2, 1, 6, 1), type: 'listener', hearing: 4 }
       ]
+    },
+    {
+      name: '12 · The Wake',
+      hint: 'These beams fill their whole street — you can never cross in front of one, only follow it. Ride the dark wake west, climb the well on the left while the lower beam sweeps east, and let the upper beam carry you to the door at its turn.',
+      grid: [
+        '##############',
+        '#............#',
+        '#...........E#',
+        '#............#',
+        '#............#',
+        '#............#',
+        '#..###########',
+        '#............#',
+        '#............#',
+        '#............#',
+        '#............#',
+        '#..........P.#',
+        '##############'
+      ],
+      guards: [
+        { route: ping(2, 3, 12, 3, 1) },   // upper street, starts west facing east
+        { route: ping(12, 9, 2, 9, 1) }    // lower street, starts east facing west
+      ]
     }
   ];
 
