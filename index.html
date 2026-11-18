@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>THEIR EYES — you can only see what they are looking at</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: dark; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #07080d;
+    color: #8b93a7;
+    font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+  }
+  body {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px;
+    padding: 18px; box-sizing: border-box;
+  }
+  h1 {
+    margin: 0; font-size: 22px; letter-spacing: 10px;
+    color: #c9d2e4; font-weight: 400; text-indent: 10px;
+  }
+  .tagline { font-size: 12px; letter-spacing: 1px; color: #5a627a; margin-top: -6px; }
+  #hud {
+    width: 100%; max-width: 648px;
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 13px;
+  }
+  #level-name { color: #e6edf6; }
+  #turns { color: #5a627a; }
+  canvas {
+    background: #07080d;
+    border: 1px solid #1a1e2c;
+    image-rendering: pixelated;
+  }
+  #hint { font-size: 12px; color: #566080; min-height: 15px; font-style: italic; }
+  #help { font-size: 11px; color: #3e465e; text-align: center; line-height: 1.7; }
+  kbd {
+    background: #12151f; border: 1px solid #262c40; border-radius: 3px;
+    padding: 1px 5px; color: #7f8aa5; font-family: inherit;
+  }
+</style>
+</head>
+<body>
+  <h1>THEIR EYES</h1>
+  <div class="tagline">you can only see what they are looking at</div>
+  <div id="hud">
+    <span id="level-name"></span>
+    <span id="turns"></span>
+  </div>
+  <canvas id="game" width="648" height="324"></canvas>
+  <div id="hint"></div>
+  <div id="help">
+    <kbd>↑←↓→</kbd> / <kbd>WASD</kbd> move &nbsp; <kbd>space</kbd> wait &nbsp;
+    <kbd>Z</kbd> undo &nbsp; <kbd>R</kbd> restart<br>
+    the amber light is a guard's gaze: it is your only eyes, and it kills you if it touches you
+  </div>
+  <script src="src/logic.js"></script>
+  <script src="src/levels.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>
