@@ -59,6 +59,9 @@ you've unlocked — your current run waits for you.
   from the tile that made the noise, a low thud sounds (`M` mutes), and a
   faint violet ring stays on you until your next action — even when the
   stare itself lands where you can't see it.
+- And you get warned **before** you move: while you stand within a listener's
+  earshot, a soft heartbeat ticks — faster and louder the closer you are.
+  Silence means no listener can hear your next step.
 - Pillars block sight but **not** sound. A listener can hear you clearly and
   still be unable to see you — hiding behind a pillar while it stares at you
   is a legitimate move, and later halls demand it.
@@ -66,7 +69,7 @@ you've unlocked — your current run waits for you.
   tool: stand where it hears you but its stare can't reach, move, and the
   stare flashes toward you — lighting the dark around it for one beat. The
   enemy's attention becomes your flashlight.
-- Reach the green door. Twelve halls, escalating.
+- Reach the green door. Thirteen halls, escalating.
 - Clear a hall and your **fastest escape** comes back as a ghost: a faint
   afterimage replaying your best run one turn at a time, trail and all. It
   paces you through the dark; beat its turn count and the ghost becomes your
@@ -97,7 +100,7 @@ to the URL.)
 ```
 index.html      open this to play
 src/logic.js    pure game rules (shared by browser and tests)
-src/levels.js   the twelve halls
+src/levels.js   the thirteen halls
 src/main.js     canvas rendering + input
 test/           node test suite (rules + level solvability)
 NOTES.md        working notes for future sessions

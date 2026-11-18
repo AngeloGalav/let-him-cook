@@ -31,11 +31,13 @@ gates (see geometry). S13 added hall 13 "The Belfry": two bells on
 perpendicular listeners whose hearing is SMALLER than sight — a bell rung in
 the open dies to its own stare, so each bell tile is a heard-but-pillar-blocked
 pocket of the OTHER guard's beam, and the crossing step onto the row-3 bell
-tile IS the ring (see geometry).
+tile IS the ring (see geometry). S14 added the heartbeat: standing inside a
+listener's earshot now plays a soft lub-dub whose rate and volume scale with
+proximity — the first cue that warns BEFORE you move (see State).
 
 ## How to run / test
 ```
-node --test                 # 51 tests incl. level solvability + replay + ghost
+node --test                 # 55 tests incl. level solvability + replay + ghost
 open index.html             # play (no build step)
 python3 -m http.server -d . 8000   # fallback if file:// is blocked
 ```
@@ -130,6 +132,17 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   created lazily and only after a real gesture (userGestured flag in
   keydown/touchstart/pointerdown) so autoplay policy is never fought and
   headless ?moves= runs stay silent.
+- Heartbeat (S14): logic.js `earshot(state)` = 0 when no listener can hear
+  the player's NEXT move, else the nearest listener's proximity
+  `(h+1-d)/(h+1)` in (0,1] (Chebyshev d, walls ignored — matches `hears`).
+  main.js draw() ticks a WebAudio lub-dub (two 64->41Hz sines 160ms apart,
+  vol .04+.12p) while playing && earshot>0 && !muted && userGestured; beat
+  interval 1500-950p ms (~1.5s at the edge of hearing, ~0.55s adjacent).
+  State-derived: undo, mute, escape, death, and the halls screen all stop it
+  for free; hbNext resets the frame the zone is left. Audio NOT verifiable
+  headless (gesture-gated, like the thud); the per-frame earshot tick IS —
+  l1/l10 screenshots render unchanged and the alert ring (drawn after the
+  heartbeat block) proves the block runs clean.
 - Halls screen (S10): main.js has a `screen` state ('game' | 'halls'); the
   game opens on halls unless `?level=`/`?moves=` is present. Cards are laid
   out by `hallCards()` (2 columns, 648×500 logical canvas; fitCanvas now
@@ -193,7 +206,7 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   the (4,4),(4,5) leak that also rings B), the exit tease beats, and the
   exit-step window. KNOWN GAP: the exit-revealing Bell A ring is geometrically
   pinned but unreachable in a live run (see Dead ends).
-- 51 tests: cone geometry (exact set + rotation symmetry), beam fan
+- 55 tests: cone geometry (exact set + rotation symmetry), beam fan
   (coverage-of-clear-line + wall-stop + bounds), turn order, pause
   tells, memory, serialize, listener rules (6), moving-wall theorem control,
   every level solvable + replayed, classifySwipe (2), black-hall design
@@ -209,7 +222,9 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   (2,3)/(3,3) in the listener's band + the column-2 flash lights the exit and
   spares the ringer, listener's row-3 bell tiles pinned incl. the column-4
   leak, exit never lit by the watcher + tease pinned to t∈{1,5,6,7}, exit
-  step survivable only at t∈{9..12}).
+  step survivable only at t∈{9..12}), earshot (4: watcher + outside -> 0 and
+edge > 0, monotone toward the listener inside the zone, tile-for-tile
+agreement with hears incl. through a wall, nearest-of-two-listeners wins).
 - Renderer verified in headless Firefox for levels 1/4/5/7/9 (start states,
   alerted stare, caught overlay) and level 7 full-solution win overlay
   ("YOU ESCAPED · turn 19") — all with the S5 beam shafts. S6 re-verified
@@ -351,19 +366,16 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
    the graze-reveal reality so the bells read as atmosphere, not puzzle.
 2. Maybe: atmosphere pass — faint dust motes drifting through the beam
    shafts, or a slight per-tile warm tint on lit floor near the guard.
-3. Maybe: audio expansion — the heard-thud is the game's only sound. A soft
-   heartbeat that fades in while a listener is within earshot (before you
-   move) would close the loop: it warns you *where* silence is required.
-   Only if it adds readability, not for ambience alone.
-4. Maybe: ghost polish — a small "ahead/behind" cue (the ghost always draws
+3. Maybe: ghost polish — a small "ahead/behind" cue (the ghost always draws
    even when slower; could dim it when behind). The level-select half of this
    landed in S10 (halls screen shows best times).
-5. Maybe: real-device touch pass — if a phone is ever available, check the
+4. Maybe: real-device touch pass — if a phone is ever available, check the
    24px swipe threshold and d-pad reach with a thumb; also consider
    long-press repeat on the d-pad.
-6. Maybe: decide whether the game is DONE — thirteen halls, every mechanic
-   represented, hub + ghost + mobile + audio all verified. If a next session
-   has no burning idea, polish README, write the final devlog, set DONE.
+5. Maybe: decide whether the game is DONE — thirteen halls, every mechanic
+   represented, hub + ghost + mobile + audio (thud + heartbeat) all verified.
+   If a next session has no burning idea, polish README, write the final
+   devlog, set DONE.
 
 ## Dead ends
 - Vertical guard patrols in rooms narrower than ~9 tiles: the ±45°/range-4
@@ -546,3 +558,15 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   exit-revealing Bell A ring turned out unreachable live (see Dead ends),
   accepted as soft necessity with a follow-up queued as Next #1. 4 design
   tests -> 51. Headless-verified start/heard-flash/win/13-card halls.
+- S14 (2026-11-18): The heartbeat — the game's first pre-move audio cue.
+  Skipped Belfry re-tuning (Next #1) on purpose: the dead-ends file shows it
+  was already buried once this session, re-entering is loop territory. Built
+  the queued heartbeat instead: logic.js `earshot(state)` (0 outside every
+  listener's range, else nearest-listener proximity (h+1-d)/(h+1), walls
+  ignored), main.js ticks a WebAudio lub-dub while you stand in the zone,
+  rate/volume scaling with depth (~1.5s edge -> ~0.55s adjacent). The
+  agreement test (earshot>0 iff hears, tile-for-tile, incl. through a wall)
+  pins the cue to the exact rule it warns about. One self-inflicted test bug:
+  asserted monotonic rise starting outside the zone where the value is pinned
+  at 0 (0 > 0). 4 tests -> 55. Headless-verified l1/l10 render unchanged
+  (audio itself needs ears).
