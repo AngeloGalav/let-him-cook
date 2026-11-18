@@ -8,7 +8,7 @@ THEIR EYES — turn-based stealth puzzle where the player can only see what the
 guards' vision cones illuminate (plus a 1-tile "touch" radius and permanent
 memory of everything ever lit). Vanilla JS, no deps. `src/logic.js` is pure
 deterministic rules (UMD: `window.TheirEyes` / `module.exports`); `src/main.js`
-is canvas rendering + input; `src/levels.js` holds 9 hand-made levels. A BFS
+is canvas rendering + input; `src/levels.js` holds 13 hand-made levels. A BFS
 solver in logic.js proves levels solvable and the test suite replays solutions
 through the real rules. Two guard types: watcher (cone only) and listener
 (hears moves within N tiles through walls, snaps to face the sound for one
@@ -27,11 +27,15 @@ is the only light for a region the other can never reach (see geometry).
 S12 added hall 12 "The Wake": two watchers, one per 5-row street of a U-shaped
 hall, each beam a full-width moving wall — the only road is a guard's dark
 wake; the escape chains two wake rides through a dark well with two flip
-gates (see geometry).
+gates (see geometry). S13 added hall 13 "The Belfry": two bells on
+perpendicular listeners whose hearing is SMALLER than sight — a bell rung in
+the open dies to its own stare, so each bell tile is a heard-but-pillar-blocked
+pocket of the OTHER guard's beam, and the crossing step onto the row-3 bell
+tile IS the ring (see geometry).
 
 ## How to run / test
 ```
-node --test                 # 47 tests incl. level solvability + replay + ghost
+node --test                 # 51 tests incl. level solvability + replay + ghost
 open index.html             # play (no build step)
 python3 -m http.server -d . 8000   # fallback if file:// is blocked
 ```
@@ -56,7 +60,7 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
 - Works: cones (±45°, range 4, wall-blocked), guard routes with pause-tiles
   that telegraph the next step, turn resolution (move → cone-check → guards
   step → sound-turn → cone-check → win-check), listener hearing + stare,
-  reveal memory, undo, 12 solvable levels, canvas renderer with smooth
+  reveal memory, undo, 13 solvable levels, canvas renderer with smooth
   raycast beam shafts (S5), violet listeners with sound-ring when alerted,
   caught/won/done overlays.
 - Mobile (S6): canvas scales to viewport width (backing store = display px ×
@@ -169,7 +173,27 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   flip gate (lit at t8/t9 approach, dark at t10/t11 after the turn, rider
   tile (12,4) dark after); well tiles (1,6),(2,6) never lit; solve length
   >= 30 pins "no shortcut".
-- 47 tests: cone geometry (exact set + rotation symmetry), beam fan
+- Belfry hall (S13): level 13, two LISTENERS on perpendicular streets with
+  hearing SMALLER than sight: A (the watcher) patrols row 1 cols 2-8 h2,
+  B (the listener) patrols col 1 rows 2-8 h3 via rot(ping(1,2,1,8,1),8) —
+  new rot() helper rotates a route's phase start. With hearing <= sight a
+  listener's summoned stare always reaches its ringer, so a bell rung in the
+  open is suicide: each bell tile must be heard-but-line-blocked, a pillar on
+  the ROUNDED midpoint of the guard->ringer sight line. Pillar (3,2) does
+  double duty: Bell A = (3,3)/(2,3) (A's south stare from (2,1) falls down
+  column 2, lights the exit (2,5), dies on the pillar before the ringer);
+  Bell B = the crossing tiles (4,2)/(4,1) (B's east stare from (1,3) runs
+  along row 3; the (1,3)->(4,2) line rounds through (3,2) too). rot aligns
+  B@(1,3)-south with A's east-end pause so the crossing step onto (4,2) at
+  t=6 IS the row-3 ring. Pillar (3,4) keeps the post-ring escape alive;
+  (2,6) gates the final step onto the exit to t=9..12 (B's south end).
+  Solver: 11 turns (a no-bell timing crawl — the lr-dance start dodges A's
+  h2 tie-stare; the exit is touch-revealed at (3,5)) — accepted soft
+  necessity, same bar as l10/l11. 4 design tests pin the bell bands (incl.
+  the (4,4),(4,5) leak that also rings B), the exit tease beats, and the
+  exit-step window. KNOWN GAP: the exit-revealing Bell A ring is geometrically
+  pinned but unreachable in a live run (see Dead ends).
+- 51 tests: cone geometry (exact set + rotation symmetry), beam fan
   (coverage-of-clear-line + wall-stop + bounds), turn order, pause
   tells, memory, serialize, listener rules (6), moving-wall theorem control,
   every level solvable + replayed, classifySwipe (2), black-hall design
@@ -181,7 +205,11 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   lighthouse design (4: hall dark in all phases, exit lit only by the col-13
   stare, row-5 trigger ring, (5,5) lit only by the other guard), wake hall
   design (5: wall-to-wall sweep, dark wake, flip-gate exit, never-lit well
-  core, ride length >= 30).
+  core, ride length >= 30), belfry design (4: watcher's bell tiles exactly
+  (2,3)/(3,3) in the listener's band + the column-2 flash lights the exit and
+  spares the ringer, listener's row-3 bell tiles pinned incl. the column-4
+  leak, exit never lit by the watcher + tease pinned to t∈{1,5,6,7}, exit
+  step survivable only at t∈{9..12}).
 - Renderer verified in headless Firefox for levels 1/4/5/7/9 (start states,
   alerted stare, caught overlay) and level 7 full-solution win overlay
   ("YOU ESCAPED · turn 19") — all with the S5 beam shafts. S6 re-verified
@@ -211,7 +239,12 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
    (moves=rllllllll: player in the dark wake behind the lower beam, exit
    arch revealed by the upper beam's memory), solver-replay win ("YOU
    ESCAPED · turn 35 · new best"), and the 12-card halls grid (6 rows,
-   footer clear, locked card shows no name).
+   footer clear, locked card shows no name). S13 verified level 13 headless:
+   start (two street beams with pillar shadows, player in the dark south-east
+   corner), the heard-flash moment (moves=lrlrllluuul: the column listener
+   turns east at its south end, violet ripple on the player, exit arch
+   remembered from the beam graze), a both-bells route replay win ("YOU
+   ESCAPED · turn 24 · new best"), and the 13-card halls grid (7 rows).
 
 ## Geometry rules for listener levels (hard-won, S2+S4)
 - Beam from a guard reaches rows ±2 (dy=2: dx=±3 in wedge; dy=3 unreachable).
@@ -294,11 +327,28 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   phase-lock guards to each other and to the player's start. Level 12 starts
   each street's guard just past its flip so the player begins IN the wake —
   the player never survives a sweep's arrival, they only inherit a shadow.
+- Bell geometry (S13): with hearing <= sight a listener's summoned stare
+  ALWAYS reaches the ringer it heard — a bell rung in the open is suicide.
+  A bell tile must be heard-but-line-blocked: a pillar exactly on the ROUNDED
+  midpoint of the guard->ringer sight line (Math.round(x.5) rounds up, so one
+  pillar at (3,2) shields both the (2,1)->(3,3) and (1,3)->(4,2) diagonals).
+  Chain design: place each bell inside the OTHER guard's beam band, so every
+  ring happens in a moving pocket of the wrong watcher's sweep.
+- The stare is a wedge, not a wire (S13): a south stare from (3,1) still
+  lights (4,3) (diagonal edge via the open (4,2)). Hand-tracing "the flash
+  falls down column X" is wrong unless coneOf says so — three hand-traced
+  Belfry routes died to diagonal stare edges before every route was verified
+  with G.replay instead.
+- rot(route,k) (S13): levels.js helper rotating a ping route's phase start —
+  S12's phase trick as a first-class tool. Equal unrotated cycles can make a
+  bell unringable (every ring tile also lit the ringer); rot fixed Bell B.
 
 ## Next (ranked)
-1. Maybe: a chain-flash hall — the only tile from which guard A can be rung
-   sits inside guard B's patrol beam, so the bell must be rung from a moving
-   pocket: two bells timed against each other.
+1. Maybe: finish The Belfry's promise — the exit-revealing Bell A ring
+   ((3,3) at t≡0, the column-2 flash) is geometrically pinned but unreachable
+   in a live run (see Dead ends): either re-tune the geometry until a both-
+   bells route exists that a player can actually find, or re-cut the hint to
+   the graze-reveal reality so the bells read as atmosphere, not puzzle.
 2. Maybe: atmosphere pass — faint dust motes drifting through the beam
    shafts, or a slight per-tile warm tint on lit floor near the guard.
 3. Maybe: audio expansion — the heard-thud is the game's only sound. A soft
@@ -311,7 +361,7 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
 5. Maybe: real-device touch pass — if a phone is ever available, check the
    24px swipe threshold and d-pad reach with a thumb; also consider
    long-press repeat on the d-pad.
-6. Maybe: decide whether the game is DONE — twelve halls, every mechanic
+6. Maybe: decide whether the game is DONE — thirteen halls, every mechanic
    represented, hub + ghost + mobile + audio all verified. If a next session
    has no burning idea, polish README, write the final devlog, set DONE.
 
@@ -372,6 +422,19 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   the rounding-quirk tiles (l7 (7,4) behind dark (6,4)) without a grace
   wide enough to cross 1-tile walls. March against WALLS only; let the floor
   lighting be the exact cue.
+- Belfry approach sweeps (S13): the exit-revealing Bell A ring (step onto
+  (3,3) arriving t≡0, A's south stare lighting the exit) needs (4,3) or
+  (2,3) at t≡12 — both lethal: A's south stare from (3,1) reaches (4,3) on
+  the diagonal edge (open (4,2) midpoint), and B's north stare from (1,8)
+  sees (2,3) up a clear line. (4,3) is occupiable only at t≡0,1,3,5; the
+  t≡8-11 crossings all die to A's diagonal stares. So Bell A's reveal ring is
+  pinned geometry but unreachable live; the door is glimpsed when B's beam
+  grazes it (t≡1,5,6,7, pinned) and touch-revealed from (3,5). Accepted as
+  soft necessity (l10/l11 bar) — revisit via Next #1.
+- Belfry v-phases (S13): both guards on equal unrotated 13-cycles made Bell B
+  unringable (every tile that rang B also lit the ringer) — fixed by
+  rot(B,8). Without pillar (3,4) the post-Bell-A escape is suicide: B@(1,6)
+  facing north lights (4,4) through the (2,5),(3,4) rounding line.
 
 ## Session log
 - S1 (2026-11-18): Picked the concept from 15 ideas, built rules + solver +
@@ -467,3 +530,19 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   never-lit well timed to the upper flip, ride the upper notch east, dive
   the exit the beat after the turn (flip-gate geometry). Solver: 35 turns;
   5 design tests -> 47. Headless-verified start/mid-ride/win/12-card halls.
+- S13 (2026-11-18): Hall 13 "The Belfry" — the chain-flash hall from Next #1.
+  Two listeners on perpendicular streets with hearing SMALLER than sight
+  (h2/h3): a listener's stare always reaches the ringer it heard, so a bell
+  rung in the open is suicide and every bell tile is a heard-but-pillar-blocked
+  pocket of the OTHER guard's beam. The pillar at (3,2) shields both bells via
+  midpoint rounding (Math.round(x.5) rounds up); rot() (new) phase-shifts the
+  column listener so the crossing step onto (4,2) doubles as the row-3 ring.
+  The big lesson was the wedge-stare trap: three hand-traced routes died to
+  diagonal stare edges I kept forgetting (a south stare still lights the
+  diagonal two rows down) — after that every route was verified with G.replay,
+  including a BFS probe over (x,y,t,mask,rung) for the both-bells win (24
+  moves, replay-verified). The solver's own 11-turn win rings nothing (a
+  timing crawl dodging A's tie-stare, exit touch-revealed) — and the
+  exit-revealing Bell A ring turned out unreachable live (see Dead ends),
+  accepted as soft necessity with a follow-up queued as Next #1. 4 design
+  tests -> 51. Headless-verified start/heard-flash/win/13-card halls.
