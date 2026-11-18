@@ -1,0 +1,117 @@
+/*
+ * THEIR EYES — levels.
+ *
+ * Legend: '#' wall, 'P' player start, 'E' exit, '.' floor.
+ * A guard route is a cyclic list of [x, y] floor tiles; consecutive tiles
+ * must be equal (a pause) or adjacent (a step). Repeated tiles make a guard
+ * stop and look toward where it will walk next — a readable tell.
+ */
+(function (root) {
+  'use strict';
+
+  // Straight line of tiles from (x1,y1) to (x2,y2), both endpoints included.
+  function line(x1, y1, x2, y2) {
+    var out = [], dx = Math.sign(x2 - x1), dy = Math.sign(y2 - y1);
+    var x = x1, y = y1;
+    out.push([x, y]);
+    while (x !== x2 || y !== y2) {
+      if (x !== x2) x += dx; else y += dy;
+      out.push([x, y]);
+    }
+    return out;
+  }
+
+  // Cyclic ping-pong patrol between two points: a→b, optional pauses at b,
+  // then back b-1→a+1 so the route wraps seamlessly. Optional pause at a.
+  function ping(x1, y1, x2, y2, pauseB, pauseA) {
+    var out = line(x1, y1, x2, y2);
+    for (var i = 0; i < (pauseB || 0); i++) out.push([x2, y2]);
+    out = out.concat(line(x2, y2, x1, y1).slice(1, -1));
+    for (var j = 0; j < (pauseA || 0); j++) out.push([x1, y1]);
+    return out;
+  }
+
+  var LEVELS = [
+    {
+      name: '1 · The Long Hall',
+      hint: 'Wait in the dark. When the beam reaches the far end and turns, run down its trail.',
+      grid: [
+        '##############',
+        '#P...........#',
+        '#............#',
+        '#............#',
+        '#............#',
+        '#.....E......#',
+        '##############'
+      ],
+      guards: [
+        { route: ping(2, 5, 12, 5, 1) }
+      ]
+    },
+    {
+      name: '2 · The Lobby',
+      hint: 'Two beams, opposite ends. Cross one row, wait, then the other.',
+      grid: [
+        '##############',
+        '#P...........#',
+        '#............#',
+        '#............#',
+        '#............#',
+        '#............#',
+        '#............#',
+        '#...........E#',
+        '##############'
+      ],
+      guards: [
+        { route: ping(2, 3, 11, 3, 1) },
+        { route: ping(11, 6, 2, 6, 1) }
+      ]
+    },
+    {
+      name: '3 · The Checkpoint',
+      hint: 'Slip through the gap at the bottom while the sweeper looks up.',
+      grid: [
+        '################',
+        '#P.....#.......#',
+        '#......#.......#',
+        '#......#.......#',
+        '#......#.......#',
+        '#......#.......#',
+        '#......#.......#',
+        '#..............#',
+        '#......#......E#',
+        '################'
+      ],
+      guards: [
+        { route: ping(8, 1, 8, 6, 2) },
+        { route: ping(9, 4, 14, 4, 1, 1) }
+      ]
+    },
+    {
+      name: '4 · The Gauntlet',
+      hint: 'Three beams. Memorize the pattern, then move.',
+      grid: [
+        '##################',
+        '#P....#......#...#',
+        '#.....#......#...#',
+        '#............#...#',
+        '#.....#......#...#',
+        '#.....#..........#',
+        '#.....#......#...#',
+        '#.....#......#...#',
+        '#.....#......#..E#',
+        '##################'
+      ],
+      guards: [
+        { route: ping(4, 1, 4, 8, 1) },
+        { route: ping(9, 1, 9, 8, 1, 1) },
+        { route: ping(15, 1, 15, 8, 1) }
+      ]
+    }
+  ];
+
+  var TheirEyesLevels = { LEVELS: LEVELS, line: line, ping: ping };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = TheirEyesLevels;
+  if (typeof window !== 'undefined') window.TheirEyesLevels = TheirEyesLevels;
+})(typeof globalThis !== 'undefined' ? globalThis : this);

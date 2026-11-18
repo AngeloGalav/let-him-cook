@@ -1,0 +1,9 @@
+{
+  "name": "their-eyes",
+  "version": "0.1.0",
+  "description": "A stealth puzzle game where you can only see what your enemies are looking at.",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/"
+  }
+}
