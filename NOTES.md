@@ -15,10 +15,12 @@ through the real rules. Two guard types: watcher (cone only) and listener
 beat; solver models it with one alert bit per listener in the BFS state). Level 10
 adds the inverted listener: hearing 4 = sight range, so a heard-but-unseen
 ring exists and the stare can be farmed as a flashlight (see geometry below).
+S8 added the ghost: your fastest escape per level is stored in localStorage
+and replays as a faint afterimage pacing you through the run.
 
 ## How to run / test
 ```
-node --test                 # 28 tests incl. level solvability + replay
+node --test                 # 33 tests incl. level solvability + replay + ghost
 open index.html             # play (no build step)
 python3 -m http.server -d . 8000   # fallback if file:// is blocked
 ```
@@ -29,7 +31,10 @@ firefox --profile /tmp/ffprofile -no-remote --screenshot /tmp/x.png \
 ```
 URL hooks in main.js: `?level=N` (1-based), `?moves=rlduw...` auto-played,
 `?touch=1` forces the touch UI (d-pad + touch help) on a desktop browser.
-Use a dedicated profile — the user's Firefox is usually running.
+Use a dedicated profile — the user's Firefox is usually running. The profile
+must exist first (mkdir it) and its localStorage persists across runs: win a
+level in one screenshot run, reload in the next to verify stateful features
+(how S8 verified the ghost).
 Solver-path → moves-string one-liner lives in the S4 commit workflow:
 `node -e` over LEVELS + solve(), map wait/r/l/d/u.
 
@@ -84,19 +89,30 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   - Solver wins in 20 turns WITHOUT the gimmick (beam-trail route via row
     3) — accepted: the dark route is the one that reveals the exit early;
     soft-necessity design, pinned by 3 design-inspection tests -> 28.
-- 28 tests: cone geometry (exact set + rotation symmetry), beam fan
+- Ghost (S8): main.js keeps `runPath` (player position per turn, synced with
+  undo pops and free-bump skips); on a win a strictly-faster run is saved to
+  localStorage as `their-eyes-best-v1-<levelIdx>` = {turns, path:"x,y;..."}.
+  Renderer draws best.path[game.turn] + a 3-dot fading trail (alpha
+  .28/.15/.07) while playing, until the ghost has escaped; header shows
+  "best N"; win overlay marks "new best". logic.js: encodeRun/decodeRun
+  (strict: any garbage -> null), isBetterRun (ties keep incumbent),
+  replay(level, movesStr) drives the real rules from 'rlduw' text. All
+  storage access try/catch'd: no storage just means no ghost.
+- 33 tests: cone geometry (exact set + rotation symmetry), beam fan
   (coverage-of-clear-line + wall-stop + bounds), turn order, pause
   tells, memory, serialize, listener rules (6), moving-wall theorem control,
   every level solvable + replayed, classifySwipe (2), black-hall design
-  properties (3: hall dark in patrol, heard-but-unseen ring, exit only
-  stare-lit).
+  properties (3), ghost (5: encode round-trip, strict decode, isBetterRun,
+  replay-of-solver-solution on all 10 levels, bump-free path steps).
 - Renderer verified in headless Firefox for levels 1/4/5/7/9 (start states,
   alerted stare, caught overlay) and level 7 full-solution win overlay
   ("YOU ESCAPED · turn 19") — all with the S5 beam shafts. S6 re-verified
   level 1 desktop (start + win) unchanged, and phone 390×844 (start/win/caught)
   with the d-pad and touch help. S7 verified level 10: start, first-move flash
   (stare down the column), exit-reveal moment (moves=rlrrrrruurrrdd), and the
-  solver replay win ("YOU ESCAPED · turn 20").
+  solver replay win ("YOU ESCAPED · turn 20"). S8 verified the ghost on level 1: win run ("new best" + best 9
+   stored), reload mid-run (ghost trail riding the player when replaying the
+   same prefix; ghost visibly AHEAD when dawdling with waits — moves=wwrrr).
 
 ## Geometry rules for listener levels (hard-won, S2+S4)
 - Beam from a guard reaches rows ±2 (dy=2: dx=±3 in wedge; dy=3 unreachable).
@@ -146,23 +162,25 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   threat to tool and is level 10's core.
 
 ## Next (ranked)
-1. "Ghost" of your best run (fewest turns) as a faint afterimage.
-2. Sound-detection feedback: subtle audio cue or screen-edge flash when a
+1. Sound-detection feedback: subtle audio cue or screen-edge flash when a
    listener hears you (currently the ring is the only tell). With level 10's
    flash gimmick the "you were heard" moment deserves a stronger cue — the
    reveal beat IS the feedback, but a silent lateral-4 move that produces no
    flash is hard to read.
-3. Maybe: a second flash hall that forces the gimmick — e.g. the exit sits
+2. Maybe: a second flash hall that forces the gimmick — e.g. the exit sits
    where only a flash from a specific far corner reaches it, or two h4
    listeners where one's stare lights the other's blind spot.
-4. Maybe: a level whose whole gimmick is the dot=0 head-walk trick (level 9
+3. Maybe: a level whose whole gimmick is the dot=0 head-walk trick (level 9
    uses it in passing; level 10's row-3 notch ride exposes it; a dedicated
    watcher-only chase hall could make the notch the main road).
-5. Maybe: atmosphere pass — faint dust motes drifting through the beam
+4. Maybe: atmosphere pass — faint dust motes drifting through the beam
    shafts, or a slight per-tile warm tint on lit floor near the guard.
-6. Maybe: real-device touch pass — if a phone is ever available, check the
+5. Maybe: real-device touch pass — if a phone is ever available, check the
    24px swipe threshold and d-pad reach with a thumb; also consider
    long-press repeat on the d-pad.
+6. Maybe: ghost polish — a small "ahead/behind" cue (the ghost always draws
+   even when slower; could dim it when behind), or surface best times on a
+   level-select screen (none exists yet).
 
 ## Dead ends
 - Vertical guard patrols in rooms narrower than ~9 tiles: the ±45°/range-4
@@ -242,3 +260,12 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   bait the stare into lighting the dark hall, trap tile (directly beneath)
   one tile from the tool tile. Documented quarter-disc flash geometry.
   3 design-inspection tests -> 28. Headless-verified start/flash/reveal/win.
+- S8 (2026-11-18): The ghost. Fastest escape per level is recorded and
+  replays as a faint afterimage with a fading trail; "best N" in the header,
+  "new best" on the win overlay. Chose to store the position path (not the
+  move string) so a corrupt save can never desync the ghost from the rules;
+  decodeRun is strict-null on garbage and all localStorage access is
+  try/catch'd. logic.js gains encodeRun/decodeRun/isBetterRun/replay (the
+  replay helper also feeds tests: solver solutions now replay through it on
+  all 10 levels). 5 tests -> 33. Headless-verified: win-to-store, reload,
+  ghost ahead of a dawdling run.
