@@ -28,7 +28,14 @@
   var screen = 'game';      // 'game' | 'halls' — the halls screen is the hub
   var selCursor = 0;        // keyboard cursor on the halls screen
   var hallBests = null;     // cache of per-level best runs; null = stale
-  var HALLS_W = 648, HALLS_H = 500; // logical size of the halls screen
+  var HALLS_W = 648; // logical width of the halls screen
+  // Card grid: two columns; the logical height GROWS with the level count
+  // (one row per pair of levels) so adding a level never overflows the hub.
+  var HALL_TOP = 64, HALL_MX = 20, HALL_GAP = 14, HALL_VGAP = 12, HALL_CH = 72;
+  function hallsH() {
+    var rows = Math.ceil(LEVELS.length / 2);
+    return HALL_TOP + rows * (HALL_CH + HALL_VGAP) - HALL_VGAP + 28;
+  }
 
   // ---------- sound: the "you were heard" thud ----------
   // A short low sine thump, synthesized on the fly (no assets). The context is
@@ -148,7 +155,7 @@
 
   function logicalSize() {
     return screen === 'halls'
-      ? { w: HALLS_W, h: HALLS_H }
+      ? { w: HALLS_W, h: hallsH() }
       : { w: game.w * TILE, h: game.h * TILE };
   }
 
@@ -162,7 +169,7 @@
     screen = 'halls';
     hallBests = null; // always show fresh times after a win
     selCursor = G.firstOpenLevel(clearedFlags(), LEVELS.length);
-    fitCanvas(HALLS_W, HALLS_H);
+    fitCanvas(HALLS_W, hallsH());
     nameEl.textContent = 'The Halls';
     hintEl.textContent = '';
     turnsEl.textContent = '';
@@ -187,7 +194,7 @@
   // renderer and the hit-test). Two columns, one row per pair of levels.
   function hallCards() {
     var n = LEVELS.length;
-    var mx = 20, top = 64, gap = 14, vgap = 12, ch = 72;
+    var mx = HALL_MX, top = HALL_TOP, gap = HALL_GAP, vgap = HALL_VGAP, ch = HALL_CH;
     var cw = (HALLS_W - mx * 2 - gap) / 2;
     var un = G.unlockedLevels(clearedFlags(), n);
     var cards = [];
@@ -394,7 +401,7 @@
   // The halls screen: a grid of cards, one per level. Cleared halls show
   // their best time (the ghost's record); locked ones show only a number.
   function drawHalls(now) {
-    ctx.clearRect(0, 0, HALLS_W, HALLS_H);
+    ctx.clearRect(0, 0, HALLS_W, hallsH());
     ctx.textAlign = 'center';
     ctx.fillStyle = '#c9d2e4';
     ctx.font = '22px ui-monospace, monospace';
@@ -442,7 +449,7 @@
     if (!game) line = touchMode ? 'tap a hall to begin' : 'arrows + enter to begin';
     else line = touchMode ? 'tap a hall · “halls” returns to your run'
                           : 'arrows + enter · L returns to your run';
-    ctx.fillText(line, HALLS_W / 2, HALLS_H - 16);
+    ctx.fillText(line, HALLS_W / 2, hallsH() - 16);
     requestAnimationFrame(draw);
   }
 
@@ -656,7 +663,7 @@
   } else {
     screen = 'halls';
     selCursor = G.firstOpenLevel(clearedFlags(), LEVELS.length);
-    fitCanvas(HALLS_W, HALLS_H);
+    fitCanvas(HALLS_W, hallsH());
     nameEl.textContent = 'The Halls';
   }
   window.addEventListener('resize', function () {
