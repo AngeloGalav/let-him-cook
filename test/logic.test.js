@@ -348,6 +348,48 @@ test('listener: solver model matches the live game (replay wins)', () => {
   assert.strictEqual(st.status, 'won');
 });
 
+test('moving-wall theorem: a swept lane needs pillar shadows to be crossable', () => {
+  // Two listeners sweeping a shared street make the lanes one and two rows
+  // off it a continuous wall of beam + hearing + stare (see NOTES dead ends).
+  // The identical room WITHOUT pillars must be unsolvable; with the pillar
+  // rows of level 8 it becomes solvable — the shadows are load-bearing, not
+  // decoration.
+  const guards = [
+    { route: ping(2, 3, 6, 3, 1), type: 'listener', hearing: 2 },
+    { route: ping(12, 3, 8, 3, 1), type: 'listener', hearing: 2 }
+  ];
+  const bare = testLevel({
+    grid: [
+      '###############',
+      '#P............#',
+      '#.............#',
+      '#.............#',
+      '#.............#',
+      '#............E#',
+      '###############'
+    ],
+    guards: guards
+  });
+  assert.strictEqual(G.solve(bare), null, 'no pillars: the lane is an impassable wall');
+  const pillared = testLevel({
+    grid: [
+      '###############',
+      '#P............#',
+      '#.#..#..#..#..#',
+      '#.............#',
+      '#..#..#..#..#.#',
+      '#............E#',
+      '###############'
+    ],
+    guards: guards
+  });
+  const path = G.solve(pillared);
+  assert.ok(path, 'pillars: solvable through the shadows');
+  const st = G.createGame(pillared);
+  for (const a of path) G.takeTurn(st, a);
+  assert.strictEqual(st.status, 'won');
+});
+
 test('every level: routes are valid floor walks', () => {
   for (const lvl of LEVELS) {
     const st = G.createGame(lvl);

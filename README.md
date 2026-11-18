@@ -48,7 +48,10 @@ move script (`r` `l` `u` `d` `w`): `index.html?level=5&moves=rdw`.
   few tiles — through walls. They snap to face the sound and stare for one
   beat: if their gaze reaches you, you're caught; if a wall blocks it, you
   just get lit. Stand still and they walk past.
-- Reach the green door. Six halls, escalating.
+- Pillars block sight but **not** sound. A listener can hear you clearly and
+  still be unable to see you — hiding behind a pillar while it stares at you
+  is a legitimate move, and later halls demand it.
+- Reach the green door. Nine halls, escalating.
 
 ## The rules of the world
 
@@ -68,7 +71,7 @@ move script (`r` `l` `u` `d` `w`): `index.html?level=5&moves=rdw`.
 ```
 index.html      open this to play
 src/logic.js    pure game rules (shared by browser and tests)
-src/levels.js   the six halls
+src/levels.js   the nine halls
 src/main.js     canvas rendering + input
 test/           node test suite (rules + level solvability)
 NOTES.md        working notes for future sessions

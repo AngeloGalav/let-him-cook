@@ -147,6 +147,56 @@
         { route: ping(2, 2, 12, 2, 1) },
         { route: ping(2, 8, 12, 8, 1), type: 'listener', hearing: 2 }
       ]
+    },
+    {
+      name: '7 · The Colonnade',
+      hint: 'This one hears three tiles in every direction — you cannot outrun the stare. But a pillar blocks it: move in the shadows.',
+      grid: [
+        '###############',
+        '#P............#',
+        '#.#..#..#..#..#',
+        '#.............#',
+        '#.#..#..#..#..#',
+        '#............E#',
+        '###############'
+      ],
+      guards: [
+        { route: ping(2, 3, 12, 3, 1), type: 'listener', hearing: 3 }
+      ]
+    },
+    {
+      name: '8 · The Split',
+      hint: 'Two listeners share the street with a gap between their patrols. A pillar shadow is the only safe place to wait.',
+      grid: [
+        '###############',
+        '#P............#',
+        '#.#..#..#..#..#',
+        '#.............#',
+        '#..#..#..#..#.#',
+        '#............E#',
+        '###############'
+      ],
+      guards: [
+        { route: ping(2, 3, 6, 3, 1), type: 'listener', hearing: 2 },
+        { route: ping(12, 3, 8, 3, 1), type: 'listener', hearing: 2 }
+      ]
+    },
+    {
+      name: '9 · The Relay',
+      hint: 'The watcher cannot hear you — walk right above its head. The listener sharing its street is a different matter.',
+      grid: [
+        '##################',
+        '#P...............#',
+        '#..#..#..#..#....#',
+        '#................#',
+        '#..#..#..#..#....#',
+        '#...............E#',
+        '##################'
+      ],
+      guards: [
+        { route: ping(2, 3, 8, 3, 1) },
+        { route: ping(15, 3, 10, 3, 1), type: 'listener', hearing: 2 }
+      ]
     }
   ];
 
