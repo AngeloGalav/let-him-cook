@@ -125,6 +125,28 @@
       guards: [
         { route: ping(2, 4, 11, 4, 1), type: 'listener', hearing: 2 }
       ]
+    },
+    {
+      name: '6 · The Divide',
+      hint: 'A beam sweeps each end. The row between them is dark and silent — but you must cross both.',
+      grid: [
+        '###############',
+        '#P............#',
+        '#.............#',
+        '#.............#',
+        '#.............#',
+        '#.............#',
+        '#.............#',
+        '#.............#',
+        '#.............#',
+        '#.............#',
+        '#............E#',
+        '###############'
+      ],
+      guards: [
+        { route: ping(2, 2, 12, 2, 1) },
+        { route: ping(2, 8, 12, 8, 1), type: 'listener', hearing: 2 }
+      ]
     }
   ];
 
