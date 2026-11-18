@@ -56,6 +56,10 @@ move script (`r` `l` `u` `d` `w`): `index.html?level=5&moves=rdw`.
   stare flashes toward you — lighting the dark around it for one beat. The
   enemy's attention becomes your flashlight.
 - Reach the green door. Ten halls, escalating.
+- Clear a hall and your **fastest escape** comes back as a ghost: a faint
+  afterimage replaying your best run one turn at a time, trail and all. It
+  paces you through the dark; beat its turn count and the ghost becomes your
+  new run. Records live in your browser's localStorage, per hall.
 
 On a phone or tablet the controls adapt: **swipe** to move, **tap** to wait,
 and an on-screen d-pad with undo/restart appears below the board. On the

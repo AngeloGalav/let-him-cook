@@ -608,3 +608,52 @@ test('black hall: the exit is invisible until a lured stare lights it', () => {
     assert.ok(lit, 'stare from x=' + gx + ' lights the exit');
   }
 });
+
+// ---------- ghost: best-run recording ----------
+
+test('ghost: encodeRun/decodeRun round-trip', () => {
+  const path = [{ x: 1, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 2 }, { x: 0, y: 7 }];
+  assert.deepStrictEqual(G.decodeRun(G.encodeRun(path)), path);
+});
+
+test('ghost: decodeRun rejects malformed storage instead of crashing', () => {
+  const bad = ['', 'x,y', '1,,2', '1.5,2', '1', ';', '1,2;', 'a,b', ' , ', null, 42, undefined, {}];
+  for (const s of bad) {
+    assert.strictEqual(G.decodeRun(s), null, 'must reject ' + JSON.stringify(s));
+  }
+});
+
+test('ghost: isBetterRun keeps the incumbent on ties', () => {
+  assert.strictEqual(G.isBetterRun({ turns: 5 }, null), true);
+  assert.strictEqual(G.isBetterRun(null, { turns: 5 }), false);
+  assert.strictEqual(G.isBetterRun({ turns: 5 }, { turns: 5 }), false);
+  assert.strictEqual(G.isBetterRun({ turns: 4 }, { turns: 5 }), true);
+  assert.strictEqual(G.isBetterRun({ turns: 6 }, { turns: 5 }), false);
+});
+
+test('ghost: replay of a solver solution wins on every level', () => {
+  for (const lvl of LEVELS) {
+    const sol = G.solve(lvl);
+    assert.ok(sol, lvl.name + ': solvable');
+    const moves = sol.map(a =>
+      a.wait ? 'w' : a.dx === 1 ? 'r' : a.dx === -1 ? 'l' : a.dy === 1 ? 'd' : 'u').join('');
+    const r = G.replay(lvl, moves);
+    assert.strictEqual(r.status, 'won', lvl.name + ': replay wins');
+    assert.strictEqual(r.turns, sol.length, lvl.name + ': turn count');
+    assert.strictEqual(r.path.length, sol.length + 1, lvl.name + ': path has turn 0');
+    assert.deepStrictEqual(r.path[r.path.length - 1], G.createGame(lvl).exit,
+      lvl.name + ': ends on the exit');
+  }
+});
+
+test('ghost: replay path steps are waits or single steps; free bumps add none', () => {
+  const lvl = testLevel({ guards: [] });
+  // 'l' bumps the wall at (0,1): free, no turn, no path entry.
+  const r = G.replay(lvl, 'lrr');
+  assert.strictEqual(r.turns, 2);
+  assert.deepStrictEqual(r.path, [{ x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 }]);
+  for (let i = 1; i < r.path.length; i++) {
+    const d = Math.abs(r.path[i].x - r.path[i - 1].x) + Math.abs(r.path[i].y - r.path[i - 1].y);
+    assert.ok(d <= 1, 'step ' + i + ' must not jump');
+  }
+});

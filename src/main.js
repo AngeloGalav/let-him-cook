@@ -20,12 +20,42 @@
   var undoStack = [];
   var allDone = false;
   var touchMode = false;
+  var runPath = [];   // player positions this run, one per turn, path[0] = start
+  var best = null;    // { turns, path } best run for this level, or null
+  var newBest = false;
+
+  // ---------- best-run storage (the ghost) ----------
+  // localStorage can be missing or throw (private mode, blocked file://), so
+  // every access is wrapped: no storage simply means no ghost.
+
+  function bestKey(i) { return 'their-eyes-best-v1-' + i; }
+
+  function loadBest(i) {
+    try {
+      var raw = window.localStorage.getItem(bestKey(i));
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      var path = G.decodeRun(o && o.path);
+      if (!path || typeof o.turns !== 'number' || o.turns !== path.length - 1) return null;
+      return { turns: o.turns, path: path };
+    } catch (e) { return null; }
+  }
+
+  function saveBest(i, run) {
+    try {
+      window.localStorage.setItem(bestKey(i),
+        JSON.stringify({ turns: run.turns, path: G.encodeRun(run.path) }));
+    } catch (e) { /* no storage: no ghost */ }
+  }
 
   function loadLevel(i) {
     levelIdx = i;
     allDone = false;
     game = G.createGame(LEVELS[i]);
     undoStack = [];
+    runPath = [{ x: game.player.x, y: game.player.y }];
+    best = loadBest(i);
+    newBest = false;
     fitCanvas();
     nameEl.textContent = LEVELS[i].name;
     hintEl.textContent = LEVELS[i].hint;
@@ -52,13 +82,23 @@
     if (game.status !== 'playing') return;
     undoStack.push(G.serialize(game));
     var consumed = G.takeTurn(game, action);
-    if (!consumed) undoStack.pop(); // wall bumps are free, not undoable
+    if (!consumed) { undoStack.pop(); return; } // wall bumps are free, not undoable
+    runPath.push({ x: game.player.x, y: game.player.y });
     if (undoStack.length > 500) undoStack.shift();
+    if (game.status === 'won') {
+      var run = { turns: game.turn, path: runPath.slice() };
+      if (G.isBetterRun(run, best)) {
+        best = run;
+        saveBest(levelIdx, run);
+        newBest = true;
+      }
+    }
   }
 
   function undo() {
     if (undoStack.length === 0) return;
     G.restore(game, undoStack.pop());
+    runPath.pop();
   }
 
   function nextLevel() {
@@ -232,6 +272,24 @@
       ctx.stroke();
     }
 
+    // ghost of your best run: a faint afterimage replaying your escape one
+    // turn at a time, with a short fading trail. It walks the recorded path
+    // regardless of what you are doing; it vanishes once it has escaped.
+    if (best && game.status === 'playing' && game.turn < best.path.length) {
+      var TRAIL = [0.28, 0.15, 0.07];
+      for (var ki = 0; ki < TRAIL.length; ki++) {
+        var ti = game.turn - ki;
+        if (ti < 0) break;
+        var gp = best.path[ti];
+        ctx.globalAlpha = TRAIL[ki];
+        ctx.fillStyle = '#9fd8ff';
+        ctx.beginPath();
+        ctx.arc(gp.x * TILE + TILE / 2, gp.y * TILE + TILE / 2, 6 - ki, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
     // you
     var pcx = game.player.x * TILE + TILE / 2, pcy = game.player.y * TILE + TILE / 2;
     ctx.save();
@@ -270,11 +328,11 @@
         ctx.fillStyle = '#5a627a';
         var key = touchMode ? 'tap' : 'Enter';
         var next = levelIdx + 1 < LEVELS.length ? key + ': next hall' : key + ': finish';
-        ctx.fillText('turn ' + game.turn + ' · ' + next, w / 2, h / 2 + 16);
+        ctx.fillText('turn ' + game.turn + (newBest ? ' · new best' : '') + ' · ' + next, w / 2, h / 2 + 16);
       }
     }
 
-    turnsEl.textContent = 'turn ' + game.turn;
+    turnsEl.textContent = 'turn ' + game.turn + (best ? ' · best ' + best.turns : '');
     requestAnimationFrame(draw);
   }
 

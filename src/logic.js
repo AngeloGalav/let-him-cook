@@ -477,6 +477,58 @@
     return { dx: 0, dy: dy > 0 ? 1 : -1 };
   }
 
+  // ---------- best-run recording (the ghost) ----------
+
+  // A finished run is recorded as the player's position for every turn,
+  // starting with the turn-0 position: path[t] is where the player stood at
+  // turn t. The ghost of your best run replays exactly that: at your turn t
+  // it is at its path[t].
+
+  // Compact storage encoding: "x,y;x,y;..."
+  function encodeRun(path) {
+    return path.map(function (p) { return p.x + ',' + p.y; }).join(';');
+  }
+
+  // Strict decoder: anything malformed returns null so a corrupt or hostile
+  // localStorage value can never crash the renderer.
+  function decodeRun(s) {
+    if (typeof s !== 'string' || s === '') return null;
+    var parts = s.split(';');
+    var out = [];
+    for (var i = 0; i < parts.length; i++) {
+      var m = /^(-?\d+),(-?\d+)$/.exec(parts[i]);
+      if (!m) return null;
+      out.push({ x: parseInt(m[1], 10), y: parseInt(m[2], 10) });
+    }
+    return out.length ? out : null;
+  }
+
+  // A run beats the incumbent only if it is strictly faster. Ties keep the
+  // incumbent, so the ghost you watch is the first run that set the record.
+  function isBetterRun(candidate, incumbent) {
+    if (!candidate) return false;
+    if (!incumbent) return true;
+    return candidate.turns < incumbent.turns;
+  }
+
+  // Replay a move string ('r' 'l' 'u' 'd' 'w') through the real rules and
+  // return { path, turns, status }. Free wall-bumps are skipped exactly like
+  // in play, so path.length always equals turns + 1.
+  function replay(level, moves) {
+    var st = createGame(level);
+    var path = [{ x: st.player.x, y: st.player.y }];
+    var ACTS = {
+      r: { dx: 1, dy: 0 }, l: { dx: -1, dy: 0 },
+      u: { dx: 0, dy: -1 }, d: { dx: 0, dy: 1 }, w: { wait: true }
+    };
+    for (var i = 0; i < moves.length; i++) {
+      var a = ACTS[moves[i]];
+      if (!a || !takeTurn(st, a)) continue;
+      path.push({ x: st.player.x, y: st.player.y });
+    }
+    return { path: path, turns: st.turn, status: st.status };
+  }
+
   var TheirEyes = {
     CONE_RADIUS: CONE_RADIUS,
     createGame: createGame,
@@ -494,7 +546,11 @@
     solve: solve,
     serialize: serialize,
     restore: restore,
-    classifySwipe: classifySwipe
+    classifySwipe: classifySwipe,
+    encodeRun: encodeRun,
+    decodeRun: decodeRun,
+    isBetterRun: isBetterRun,
+    replay: replay
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = TheirEyes;
