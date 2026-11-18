@@ -8,7 +8,7 @@ THEIR EYES — turn-based stealth puzzle where the player can only see what the
 guards' vision cones illuminate (plus a 1-tile "touch" radius and permanent
 memory of everything ever lit). Vanilla JS, no deps. `src/logic.js` is pure
 deterministic rules (UMD: `window.TheirEyes` / `module.exports`); `src/main.js`
-is canvas rendering + input; `src/levels.js` holds 6 hand-made levels. A BFS
+is canvas rendering + input; `src/levels.js` holds 9 hand-made levels. A BFS
 solver in logic.js proves levels solvable and the test suite replays solutions
 through the real rules. Two guard types: watcher (cone only) and listener
 (hears moves within N tiles through walls, snaps to face the sound for one
@@ -16,7 +16,7 @@ beat; solver models it with one alert bit per listener in the BFS state).
 
 ## How to run / test
 ```
-node --test                 # 17 tests incl. level solvability + replay
+node --test                 # 20 tests incl. level solvability + replay
 open index.html             # play (no build step)
 python3 -m http.server -d . 8000   # fallback if file:// is blocked
 ```
@@ -27,75 +27,105 @@ firefox --profile /tmp/ffprofile -no-remote --screenshot /tmp/x.png \
 ```
 URL hooks in main.js: `?level=N` (1-based), `?moves=rlduw...` auto-played.
 Use a dedicated profile — the user's Firefox is usually running.
+Solver-path → moves-string one-liner lives in the S4 commit workflow:
+`node -e` over LEVELS + solve(), map wait/r/l/d/u.
 
 ## State
 - Works: cones (±45°, range 4, wall-blocked), guard routes with pause-tiles
   that telegraph the next step, turn resolution (move → cone-check → guards
   step → sound-turn → cone-check → win-check), listener hearing + stare,
-  reveal memory, undo, 6 solvable levels, canvas renderer with beam pulse,
+  reveal memory, undo, 9 solvable levels, canvas renderer with beam pulse,
   violet listeners with sound-ring when alerted, caught/won/done overlays.
-- Cone geometry is now EXACT integer math (S3): wedge test is
-  `2*dot*dot >= d2*f2` with `d2 <= 16`, diagonal edge tiles included, no
-  float noise, works for any integer facing vector. Relative to facing,
-  visible set = own tile + {dx 1..4, |dy| <= dx, dx²+dy² <= 16}. Compared
-  to the old float version this adds exactly 4 tiles per guard: the 45°
-  diagonals at distance 1 and 2 ((3,3)/(4,4) were always range-excluded).
-  All 6 levels re-proved solvable; one test-only listener level needed a
-  redesign (its dash lane got swept by the widened stare).
-- Renderer verified in real (headless) Firefox (re-checked S3 after the
-  geometry change): level 1, level 5 start / stare / caught-by-stare,
-  level 6 start. First frame draws synchronously so screenshots and
-  instant loads work.
-- 19 tests: cone geometry (exact set + rotation symmetry across facings),
-  turn order, pause tells, memory, serialize, listener rules (6), every
-  level solvable + replayed.
+- Cone geometry is exact integer math (S3): wedge test `2*dot*dot >= d2*f2`,
+  `d2 <= 16`, diagonal edges included, any integer facing.
+- S4 added the pillar-shadow design space (levels 7-9):
+  - 7 · The Colonnade: one listener, HEARING 3 (new), full-width patrol,
+    pillar rows between patrol row and lanes. h3 kills trailing-the-beam
+    (see geometry below); the only safe moves are pillar-shadowed.
+  - 8 · The Split: two listeners, one street, split patrols with a gap
+    column, staggered pillar rows. First 2-listener level; the alert mask
+    already supported it.
+  - 9 · The Relay: watcher + listener share one street (split patrols).
+    Walking directly above a watcher's head is safe (dot=0 → outside the
+    ±45° wedge); the listener half forces shadow play.
+  - New regression test: identical room with vs without pillars — bare room
+    UNSOLVABLE, pillared room solvable + replay. Pillars are load-bearing.
+- 20 tests: cone geometry (exact set + rotation symmetry), turn order, pause
+  tells, memory, serialize, listener rules (6), moving-wall theorem control,
+  every level solvable + replayed.
+- Renderer verified in headless Firefox for levels 7/8/9 (start states) and
+  level 7 full-solution win overlay ("YOU ESCAPED · turn 19").
+
+## Geometry rules for listener levels (hard-won, S2+S4)
+- Beam from a guard reaches rows ±2 (dy=2: dx=±3 in wedge; dy=3 unreachable).
+  Lanes 3+ rows off a patrol row are beam-safe; lanes 1-2 off are swept.
+- Moving-wall theorem (S2): a listener patrolling a narrow room's width makes
+  lanes 1-2 off its row impassable — beam+hearing+stare cover them
+  continuously in two disconnected pockets.
+- Pillar shadows (S4): pillars on the row BETWEEN a lane and the patrol row
+  cast clean shadows on the lane (the sight line crosses the pillar row).
+  This is what makes lanes 2 off crossable. Verified by the control test.
+- Pillars ON the lane itself are leaky: a (2,1)-distance sight line's
+  midpoint rounds to the PATROL row (Math.round(x.5) rounds up), so the
+  beam clips around a same-row pillar when the guard is 1 column away.
+  Shadow holds only at guard distance >= 2 columns.
+- A lane 1 row off a listener's patrol row is a death strip: the (1,1)
+  diagonal stare is adjacent (no midpoint to block) and hearing covers it.
+  Don't put exits on such a lane; keep exit lanes 2 off with a pillar row
+  between.
+- HEARING 3 kills the "trail the beam at distance 3" exploit (the free
+  solution to every h2 corridor level): at dx=3 you're heard, the stare
+  reaches 4. Trailing needs dx>=4, which full-width patrols don't allow.
+- dot=0 tiles (directly beside/above/below the facing) are OUTSIDE the ±45°
+  wedge: you can stand one row above a watcher's head and be invisible.
+  Level 9's opening is built on this.
+- Free-highway trap: any travel lane 3+ rows from the nearest guard is
+  beam-unreachable and boring (l9a/l9b first drafts: top row was a free
+  sprint). Keep every lane within dy=2 of some guard.
 
 ## Next (ranked)
-1. More levels (7–9): a pillar room where blocked line-of-sight makes heard
-   tiles safe (the one way to break the listener's moving wall — see dead
-   ends); two listeners (mask already supports it); a level forcing you to
-   use a blocked stare as a light source.
-2. Beam rendering upgrade: smooth polygon fan (raycast edges) instead of
-   per-tile squares; also the amber pulse reads muddy-brown at alpha 0.16 —
-   try additive-ish brighter overlay.
-3. Mobile: on-screen d-pad + swipe; turn-based so it fits phones.
-4. "Ghost" of your best run (fewest turns) as a faint afterimage.
-5. Sound-detection feedback: a subtle audio cue or screen-edge flash when a
+1. Beam rendering upgrade: smooth polygon fan (raycast edges) instead of
+   per-tile squares; the amber pulse reads muddy-brown at alpha 0.16 — try a
+   brighter additive-ish overlay.
+2. Mobile: on-screen d-pad + swipe; turn-based so it fits phones.
+3. "Ghost" of your best run (fewest turns) as a faint afterimage.
+4. Sound-detection feedback: subtle audio cue or screen-edge flash when a
    listener hears you (currently the ring is the only tell).
+5. A "stare as a light source" level: make noise behind cover so the
+   listener's blocked stare lights a dark corridor you need to see into.
+   NOTE: the solver can't verify the player NEEDS the light (it has full
+   info) — verify by design inspection: target region must be dark unless
+   the listener is staring at the noise-maker.
+6. Maybe: a level whose whole gimmick is the dot=0 head-walk trick (level 9
+   uses it in passing; a dedicated hall could be a watcher-only chase).
 
 ## Dead ends
 - Vertical guard patrols in rooms narrower than ~9 tiles: the ±45°/range-4
-  wedge sweeps the whole room and the player is unconditionally caught in the
-  first sweep. Levels 2 and 3 failed this way; fixed by horizontal sweepers
-  and putting crossings at patrol ends where the beam faces away.
-- A guard patrolling the same row as the player's only corridor (old level 1):
-  equal speeds mean you can never overtake it. Exits must not require
-  overtaking a same-speed patrol.
-- Crossing a guard's patrol column mid-column: the guard's own tile + forward
-  wedge make the column a death strip. Cross at column ends.
-- LISTENER MOVING WALL: a listener whose patrol spans a narrow room's width
-  is an impassable moving wall. On lanes 2 rows off the patrol row, the union
-  of beam + hearing + stare continuously covers gx-3..gx+3 (facing west) or
-  gx-3..gx+3 (east), and the safe set is always two disconnected pockets —
-  the player can never cross the listener's column. Two unit-test levels died
-  this way. Design rules for listener levels: (a) put travel lanes >= 3 rows
-  off the patrol row (beam can't reach dy=3, hearing must be <= 2), or (b)
-  use pillars that block line-of-sight so heard-but-blocked tiles are safe,
-  or (c) keep the listener away from corridors the player must traverse
-  end-to-end. Levels 5 and 6 use (a).
+  wedge sweeps the whole room; player unconditionally caught. Fixed by
+  horizontal sweepers; crossings at patrol ends where the beam faces away.
+- A guard patrolling the same row as the player's only corridor: equal
+  speeds mean you can never overtake it. Exits must not require overtaking.
+- Crossing a guard's patrol column mid-column: guard tile + forward wedge
+  make it a death strip. Cross at column ends or behind the beam.
+- LISTENER MOVING WALL: see geometry rules. Design rules for listener
+  levels: (a) lanes >= 3 rows off (beam-unreachable), (b) pillars between
+  lane and patrol row (shadows), or (c) keep listeners off corridors the
+  player must traverse end-to-end. Levels 5/6 use (a); 7/8/9 use (b).
+- Two listeners on rows 4 apart sweeping a shared middle lane (lane 2 off
+  BOTH): unsolvable even with pillar rows — the two moving walls' pockets
+  never connect. (l8a/l8c/l8d all UNSOLVABLE.) Two listeners work when
+  they SHARE one street (level 8) or guard separate areas (level 6).
+- h3 listeners with split patrols + gap column: also unsolvable (l8e) —
+  h3's hearing covers the gap whenever either guard is near an end.
+  h2 leaves the gap silent when both are at far ends; that's level 8.
 - "Noise as a beam-aiming tool" is weak under current rules: a stare that
-  reaches you kills you (no reveal value), and a blocked stare only lights
-  tiles you already feel by touch. A level built on it needs the pillar
-  geometry from the dead end above to give it a point.
-- S2's note "diagonal k=3 is in the cone, k=1,2,4 out" was WRONG: the range
-  check (d<=4) already excluded (3,3) and (4,4), so the old float wedge
-  excluded ALL diagonal edge tiles. The S3 fix (edges included) therefore
-  only adds the 45° tiles at distance 1–2 — far less disruptive than the
-  feared "beams get wider, levels may need redesign". Listener moving-wall
-  theorem unchanged: dy=3 lanes are still beam-unreachable.
+  reaches you kills you, and a blocked stare only lights tiles near the
+  pillar. A level built on it needs the Next-5 design.
+- S2's note "diagonal k=3 is in the cone" was WRONG (see S3 note in git
+  history): range check excluded (3,3)/(4,4); the S3 fix only added the
+  45° tiles at distance 1-2.
 - Rotation tests in screen coords (y DOWN): the map that rotates facing
-  north to east is (x,y)->(-y,x), NOT (x,y)->(y,-x). Tripped on this twice
-  in one session; the west map (-x,-y) is the only direction-agnostic one.
+  north to east is (x,y)->(-y,x), NOT (x,y)->(y,-x). Tripped on twice.
 - `node --test test/` (trailing slash) fails on node 22; use `node --test`.
 - Do NOT `cp templates/*.md` over filled NOTES/DEVLOG (did it in S2; git
   checkout saved it).
@@ -115,3 +145,8 @@ Use a dedicated profile — the user's Firefox is usually running.
   re-proved by the solver; one test-only listener level redesigned (old dash
   lane now swept). Added exact-wedge-set and rotation-symmetry tests → 19.
   Re-verified renderer in headless Firefox.
+- S4 (2026-11-18): Built the pillar-shadow design space: levels 7 (Colonnade,
+  first h3 listener), 8 (Split, two listeners one street), 9 (Relay, watcher
+  + listener). Control test proves pillars load-bearing (bare room
+  unsolvable). Documented the shadow geometry rules (see above). 20 tests.
+  Renderer + win overlay verified in headless Firefox.
