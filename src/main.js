@@ -19,21 +19,31 @@
   var game = null;
   var undoStack = [];
   var allDone = false;
+  var touchMode = false;
 
   function loadLevel(i) {
     levelIdx = i;
     allDone = false;
     game = G.createGame(LEVELS[i]);
     undoStack = [];
-    var w = game.w * TILE, h = game.h * TILE;
-    var dpr = window.devicePixelRatio || 1;
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
-    canvas.style.width = w + 'px';
-    canvas.style.height = h + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    fitCanvas();
     nameEl.textContent = LEVELS[i].name;
     hintEl.textContent = LEVELS[i].hint;
+  }
+
+  // Scale the canvas down to fit narrow screens (phones); never upscale past
+  // the native tile size. The backing store follows the display size times
+  // devicePixelRatio so everything stays sharp on high-DPI phones.
+  function fitCanvas() {
+    var w = game.w * TILE, h = game.h * TILE;
+    var avail = Math.max(240, Math.min(window.innerWidth, document.documentElement.clientWidth) - 40);
+    var scale = Math.min(1, avail / w);
+    var dpr = window.devicePixelRatio || 1;
+    canvas.style.width = Math.round(w * scale) + 'px';
+    canvas.style.height = Math.round(h * scale) + 'px';
+    canvas.width = Math.round(w * scale * dpr);
+    canvas.height = Math.round(h * scale * dpr);
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
   }
 
   // ---------- input ----------
@@ -49,6 +59,15 @@
   function undo() {
     if (undoStack.length === 0) return;
     G.restore(game, undoStack.pop());
+  }
+
+  function nextLevel() {
+    if (game.status !== 'won') return;
+    if (levelIdx + 1 < LEVELS.length) {
+      loadLevel(levelIdx + 1);
+    } else {
+      allDone = true;
+    }
   }
 
   document.addEventListener('keydown', function (e) {
@@ -70,15 +89,50 @@
     } else if (k === 'r' || k === 'R') {
       loadLevel(levelIdx);
     } else if (k === 'Enter') {
-      if (game.status === 'won') {
-        if (levelIdx + 1 < LEVELS.length) {
-          loadLevel(levelIdx + 1);
-        } else {
-          allDone = true;
-        }
-      }
+      nextLevel();
     }
   });
+
+  // ---------- touch ----------
+  // Swipe = move, tap = wait (classifySwipe in logic.js decides). On the
+  // end-of-run overlays a tap restarts (caught) or advances (escaped), so the
+  // game is fully playable without a keyboard.
+  var touchStart = null;
+  canvas.addEventListener('touchstart', function (e) {
+    if (e.touches.length === 1) {
+      touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  }, { passive: true });
+  canvas.addEventListener('touchend', function (e) {
+    if (!touchStart) return;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
+    touchStart = null;
+    e.preventDefault();
+    if (allDone) { loadLevel(0); return; }
+    if (game.status === 'caught') { loadLevel(levelIdx); return; }
+    if (game.status === 'won') { nextLevel(); return; }
+    act(G.classifySwipe(dx, dy));
+  });
+
+  // On-screen d-pad (shown only in touch mode, see body.touch in the CSS).
+  var TOUCH_ACTIONS = {
+    up: { dx: 0, dy: -1 }, down: { dx: 0, dy: 1 },
+    left: { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 },
+    wait: { wait: true }
+  };
+  var pads = document.querySelectorAll('#touch-controls [data-act]');
+  for (var p = 0; p < pads.length; p++) {
+    (function (btn) {
+      var name = btn.getAttribute('data-act');
+      btn.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        if (name === 'undo') undo();
+        else if (name === 'restart') loadLevel(levelIdx);
+        else act(TOUCH_ACTIONS[name]);
+      });
+    })(pads[p]);
+  }
 
   // ---------- rendering ----------
 
@@ -200,21 +254,22 @@
         ctx.fillText('YOU HAVE THEIR EYES', w / 2, h / 2 - 14);
         ctx.font = '13px ui-monospace, monospace';
         ctx.fillStyle = '#5a627a';
-        ctx.fillText('every hall cleared · R to walk them again', w / 2, h / 2 + 16);
+        ctx.fillText('every hall cleared · ' + (touchMode ? 'tap' : 'R') + ' to walk them again', w / 2, h / 2 + 16);
       } else if (game.status === 'caught') {
         ctx.fillStyle = '#ff6b6b';
         ctx.font = '28px ui-monospace, monospace';
         ctx.fillText('CAUGHT', w / 2, h / 2 - 14);
         ctx.font = '13px ui-monospace, monospace';
         ctx.fillStyle = '#5a627a';
-        ctx.fillText('R restart · Z undo', w / 2, h / 2 + 16);
+        ctx.fillText(touchMode ? 'tap to restart' : 'R restart · Z undo', w / 2, h / 2 + 16);
       } else if (game.status === 'won') {
         ctx.fillStyle = '#34d399';
         ctx.font = '28px ui-monospace, monospace';
         ctx.fillText('YOU ESCAPED', w / 2, h / 2 - 14);
         ctx.font = '13px ui-monospace, monospace';
         ctx.fillStyle = '#5a627a';
-        var next = levelIdx + 1 < LEVELS.length ? 'Enter: next hall' : 'Enter: finish';
+        var key = touchMode ? 'tap' : 'Enter';
+        var next = levelIdx + 1 < LEVELS.length ? key + ': next hall' : key + ': finish';
         ctx.fillText('turn ' + game.turn + ' · ' + next, w / 2, h / 2 + 16);
       }
     }
@@ -224,11 +279,16 @@
   }
 
   // URL test hooks for headless verification: ?level=N (1-based) selects a
-  // level, ?moves=rlduw... auto-plays a move script on load.
+  // level, ?moves=rlduw... auto-plays a move script on load, ?touch=1 forces
+  // the touch UI on (for screenshots on a desktop browser).
   var params = new URLSearchParams(window.location.search);
+  touchMode = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+              params.get('touch') === '1';
+  if (touchMode) document.body.classList.add('touch');
   var start = parseInt(params.get('level'), 10);
   start = isNaN(start) ? 1 : Math.min(Math.max(start, 1), LEVELS.length);
   loadLevel(start - 1);
+  window.addEventListener('resize', function () { if (game) fitCanvas(); });
   var moves = params.get('moves') || '';
   for (var mi = 0; mi < moves.length; mi++) {
     var m = moves[mi];

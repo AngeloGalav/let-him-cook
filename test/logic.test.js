@@ -522,3 +522,23 @@ test('every level: solvable, and the solution replays in the real game', () => {
       lvl.name + ': replay of solution did not win');
   }
 });
+
+test('classifySwipe: swipes map to the dominant axis, small moves are taps', () => {
+  assert.deepStrictEqual(G.classifySwipe(60, 8), { dx: 1, dy: 0 });
+  assert.deepStrictEqual(G.classifySwipe(-60, -8), { dx: -1, dy: 0 });
+  assert.deepStrictEqual(G.classifySwipe(8, 60), { dx: 0, dy: 1 });
+  assert.deepStrictEqual(G.classifySwipe(-8, -60), { dx: 0, dy: -1 });
+  assert.deepStrictEqual(G.classifySwipe(3, -2), { wait: true }, 'below threshold is a tap');
+  assert.deepStrictEqual(G.classifySwipe(0, 0), { wait: true });
+  assert.deepStrictEqual(G.classifySwipe(40, -40), { dx: 1, dy: 0 }, 'tie goes horizontal');
+  assert.deepStrictEqual(G.classifySwipe(30, 0, 40), { wait: true }, 'custom threshold');
+  assert.deepStrictEqual(G.classifySwipe(50, 0, 40), { dx: 1, dy: 0 });
+});
+
+test('classifySwipe: results are valid actions for takeTurn', () => {
+  const st = G.createGame(testLevel({}));
+  assert.ok(G.takeTurn(st, G.classifySwipe(50, 4)), 'right swipe consumed the turn');
+  assert.strictEqual(st.player.x, 2);
+  assert.ok(G.takeTurn(st, G.classifySwipe(0, 0)), 'tap (wait) consumed the turn');
+  assert.strictEqual(st.player.x, 2, 'tap did not move the player');
+});

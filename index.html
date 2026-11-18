@@ -32,13 +32,46 @@
   canvas {
     background: #07080d;
     border: 1px solid #1a1e2c;
-    image-rendering: pixelated;
+    touch-action: none; /* the canvas owns swipes and taps */
   }
   #hint { font-size: 12px; color: #566080; min-height: 15px; font-style: italic; }
   #help { font-size: 11px; color: #3e465e; text-align: center; line-height: 1.7; }
   kbd {
     background: #12151f; border: 1px solid #262c40; border-radius: 3px;
     padding: 1px 5px; color: #7f8aa5; font-family: inherit;
+  }
+  #help-touch { display: none; }
+  body.touch #help-keys { display: none; }
+  body.touch #help-touch { display: inline; }
+  /* on-screen controls: hidden until main.js adds body.touch (coarse pointer
+     or ?touch=1); pointerdown on the buttons keeps taps instant */
+  #touch-controls { display: none; }
+  body.touch #touch-controls {
+    display: flex; align-items: center; justify-content: center; gap: 34px;
+  }
+  .dpad {
+    display: grid; gap: 6px;
+    grid-template-areas: ". u ." "l w r" ". d .";
+  }
+  .dpad [data-act="up"] { grid-area: u; }
+  .dpad [data-act="left"] { grid-area: l; }
+  .dpad [data-act="wait"] { grid-area: w; }
+  .dpad [data-act="right"] { grid-area: r; }
+  .dpad [data-act="down"] { grid-area: d; }
+  .tside { display: flex; flex-direction: column; gap: 10px; }
+  #touch-controls button {
+    width: 58px; height: 58px;
+    background: #12151f; border: 1px solid #2a3048; border-radius: 12px;
+    color: #8b93a7; font: inherit; font-size: 18px;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tside button { width: 88px; height: 46px; font-size: 13px; }
+  #touch-controls button:active { background: #1d2334; color: #e6edf6; border-color: #3a4260; }
+  @media (max-width: 640px) {
+    body { padding: 10px; gap: 10px; }
+    h1 { font-size: 18px; letter-spacing: 7px; text-indent: 7px; }
+    #help { font-size: 10px; }
   }
 </style>
 </head>
@@ -51,11 +84,25 @@
   </div>
   <canvas id="game" width="648" height="324"></canvas>
   <div id="hint"></div>
+  <div id="touch-controls">
+    <div class="dpad">
+      <button data-act="up" aria-label="move up">▲</button>
+      <button data-act="left" aria-label="move left">◀</button>
+      <button data-act="wait" aria-label="wait one beat">·</button>
+      <button data-act="right" aria-label="move right">▶</button>
+      <button data-act="down" aria-label="move down">▼</button>
+    </div>
+    <div class="tside">
+      <button data-act="undo">undo</button>
+      <button data-act="restart">restart</button>
+    </div>
+  </div>
   <div id="help">
-    <kbd>↑←↓→</kbd> / <kbd>WASD</kbd> move &nbsp; <kbd>space</kbd> wait &nbsp;
-    <kbd>Z</kbd> undo &nbsp; <kbd>R</kbd> restart<br>
+    <span id="help-keys"><kbd>↑←↓→</kbd> / <kbd>WASD</kbd> move &nbsp; <kbd>space</kbd> wait &nbsp;
+    <kbd>Z</kbd> undo &nbsp; <kbd>R</kbd> restart</span>
+    <span id="help-touch">swipe to move · tap to wait · tap the overlay to continue</span><br>
     the amber light is a guard's gaze: it is your only eyes, and it kills you if it touches you<br>
-    a <span style="color:#c084fc">violet</span> guard hears you move — stand still (<kbd>space</kbd>) and it walks past
+    a <span style="color:#c084fc">violet</span> guard hears you move — stand still (space / tap) and it walks past
   </div>
   <script src="src/logic.js"></script>
   <script src="src/levels.js"></script>

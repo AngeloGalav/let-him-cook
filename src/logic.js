@@ -466,6 +466,17 @@
     return state;
   }
 
+  // Touch input helper (pure): map a swipe vector in pixels to a player
+  // action. Movement below the threshold is a tap (wait). The dominant axis
+  // wins; on a perfect tie horizontal wins (documented in tests).
+  function classifySwipe(dx, dy, threshold) {
+    var th = (typeof threshold === 'number') ? threshold : 24;
+    var adx = Math.abs(dx), ady = Math.abs(dy);
+    if (Math.max(adx, ady) < th) return { wait: true };
+    if (adx >= ady) return { dx: dx > 0 ? 1 : -1, dy: 0 };
+    return { dx: 0, dy: dy > 0 ? 1 : -1 };
+  }
+
   var TheirEyes = {
     CONE_RADIUS: CONE_RADIUS,
     createGame: createGame,
@@ -482,7 +493,8 @@
     cycleLength: cycleLength,
     solve: solve,
     serialize: serialize,
-    restore: restore
+    restore: restore,
+    classifySwipe: classifySwipe
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = TheirEyes;
