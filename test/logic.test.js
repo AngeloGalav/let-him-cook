@@ -609,6 +609,103 @@ test('black hall: the exit is invisible until a lured stare lights it', () => {
   }
 });
 
+// ---------- level 11: The Lighthouse (two bells, two blind spots) ----------
+//
+// Two h4 listeners on PERPENDICULAR streets: one patrols the top row, one
+// the left column. Their patrol beams never reach the hall (rows 4-5 from
+// col 6 east, cols 2-5 below the wedges), so the only light there is a
+// lured stare — and each guard's stare is the ONLY light for a region the
+// other can never reach: the top guard's column flashes light the exit at
+// (13,5) but the left guard's reach ends at column 5; the left guard's row
+// flashes light (5,5), which no top-guard stare can (its column-5 flash
+// dies on the pillar at (5,3), and the quarter-disc reach forbids the
+// diagonal ones). Same soft-necessity bar as level 10: the solver proves
+// the level winnable in the dark; these tests pin that the light only
+// exists if you ring a bell.
+
+const lighthouse = LEVELS.find(l => l.name.indexOf('Lighthouse') >= 0);
+
+test('lighthouse: two h4 listeners; the hall is dark in every patrol phase', () => {
+  assert.ok(lighthouse, 'level 11 exists');
+  for (const g of lighthouse.guards) {
+    assert.strictEqual(g.type, 'listener');
+    assert.strictEqual(g.hearing, 4, 'hearing must match sight range to be ringable');
+  }
+  const st = G.createGame(lighthouse);
+  const cycle = G.cycleLength(lighthouse);
+  for (let t = 0; t < cycle; t++) {
+    for (let gi = 0; gi < 2; gi++) {
+      for (const c of G.coneOf(st, G.guardAt(lighthouse, gi, t))) {
+        assert.ok(!(c.y >= 4 && c.x >= 6),
+          'phase ' + t + ' guard ' + gi + ': patrol beam leaked into the hall at ' + c.x + ',' + c.y);
+      }
+    }
+  }
+});
+
+test('lighthouse: the exit is invisible until the top guard is rung from column 13', () => {
+  const st = G.createGame(lighthouse);
+  const cycle = G.cycleLength(lighthouse);
+  for (let t = 0; t < cycle; t++) {
+    for (let gi = 0; gi < 2; gi++) {
+      const lit = G.coneOf(st, G.guardAt(lighthouse, gi, t)).some(c => c.x === 13 && c.y === 5);
+      assert.ok(!lit, 'phase ' + t + ' guard ' + gi + ': exit visible without a stare');
+    }
+  }
+  // Only a south stare from column 13 reaches (13,5): the quarter-disc dies
+  // at d2 > 16, so column-12 and column-11 stares miss it, and the left
+  // guard's east stare tops out at column 5.
+  const south = { x: 0, y: 1 };
+  const lights = [];
+  for (let a = 2; a <= 13; a++) {
+    if (G.coneOf(st, { x: a, y: 1, facing: south }).some(c => c.x === 13 && c.y === 5)) lights.push(a);
+  }
+  assert.deepStrictEqual(lights, [13]);
+});
+
+test('lighthouse: heard-but-unseen trigger ring along row 5', () => {
+  const st = G.createGame(lighthouse);
+  const g = { type: 'listener', hearing: 4, x: 13, y: 1 };
+  const south = { x: 0, y: 1 };
+  const staredAt = (x, y) =>
+    G.coneOf(st, { x: 13, y: 1, facing: south }).some(t => t.x === x && t.y === y);
+  // Row 5 (dy=4): lateral 1..4 west of the column is heard and outside the
+  // stare (d2 > 16); lateral 0 is directly beneath and lethal; lateral 5 is
+  // out of earshot, so no flash at all.
+  for (const dx of [1, 2, 3, 4]) {
+    assert.ok(G.hears(g, 13 - dx, 5), 'dx=' + dx + ' is heard');
+    assert.ok(!staredAt(13 - dx, 5), 'dx=' + dx + ' survives the stare');
+  }
+  assert.ok(G.hears(g, 13, 5), 'directly beneath is heard');
+  assert.ok(staredAt(13, 5), 'directly beneath dies to the stare');
+  assert.ok(!G.hears(g, 8, 5), 'dx=5 is out of earshot');
+});
+
+test('lighthouse: (5,5) is a blind spot only the OTHER guard can light', () => {
+  const st = G.createGame(lighthouse);
+  const cycle = G.cycleLength(lighthouse);
+  // Never lit by any patrol phase...
+  for (let t = 0; t < cycle; t++) {
+    for (let gi = 0; gi < 2; gi++) {
+      const lit = G.coneOf(st, G.guardAt(lighthouse, gi, t)).some(c => c.x === 5 && c.y === 5);
+      assert.ok(!lit, 'phase ' + t + ' guard ' + gi + ': (5,5) lit without a stare');
+    }
+  }
+  // ...no top-guard south stare can reach it (column 5 is blocked by the
+  // pillar at (5,3); the diagonals are past the quarter-disc)...
+  const south = { x: 0, y: 1 };
+  for (let a = 2; a <= 13; a++) {
+    const lit = G.coneOf(st, { x: a, y: 1, facing: south }).some(c => c.x === 5 && c.y === 5);
+    assert.ok(!lit, 'top-guard stare from column ' + a + ' must not light (5,5)');
+  }
+  // ...but the left guard, rung from (5,5) itself, stares east and lights it.
+  assert.ok(G.hears({ type: 'listener', hearing: 4, x: 1, y: 5 }, 5, 5), 'the left guard hears it');
+  assert.ok(
+    G.coneOf(st, { x: 1, y: 5, facing: { x: 1, y: 0 } }).some(c => c.x === 5 && c.y === 5),
+    'the east stare lights (5,5)'
+  );
+});
+
 // ---------- ghost: best-run recording ----------
 
 test('ghost: encodeRun/decodeRun round-trip', () => {

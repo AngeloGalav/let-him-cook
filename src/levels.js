@@ -213,6 +213,24 @@
       guards: [
         { route: ping(2, 1, 13, 1, 1), type: 'listener', hearing: 4 }
       ]
+    },
+    {
+      name: '11 · The Lighthouse',
+      hint: 'Two listeners ring the dark hall: one walks the top street, one the left wall. They hear four tiles but see only their own street. Move to summon a stare — it falls down the guard column, or along its row — and light the hall one flash at a time.',
+      grid: [
+        '###############',
+        '#P............#',
+        '#.............#',
+        '#.#..#..#..#..#',
+        '#.............#',
+        '#............E#',
+        '#.............#',
+        '###############'
+      ],
+      guards: [
+        { route: ping(3, 1, 13, 1, 1), type: 'listener', hearing: 4 },
+        { route: ping(1, 2, 1, 6, 1), type: 'listener', hearing: 4 }
+      ]
     }
   ];
 
