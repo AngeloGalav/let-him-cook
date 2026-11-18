@@ -66,7 +66,7 @@ you've unlocked — your current run waits for you.
   tool: stand where it hears you but its stare can't reach, move, and the
   stare flashes toward you — lighting the dark around it for one beat. The
   enemy's attention becomes your flashlight.
-- Reach the green door. Ten halls, escalating.
+- Reach the green door. Eleven halls, escalating.
 - Clear a hall and your **fastest escape** comes back as a ghost: a faint
   afterimage replaying your best run one turn at a time, trail and all. It
   paces you through the dark; beat its turn count and the ghost becomes your
@@ -97,7 +97,7 @@ to the URL.)
 ```
 index.html      open this to play
 src/logic.js    pure game rules (shared by browser and tests)
-src/levels.js   the ten halls
+src/levels.js   the eleven halls
 src/main.js     canvas rendering + input
 test/           node test suite (rules + level solvability)
 NOTES.md        working notes for future sessions

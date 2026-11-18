@@ -20,11 +20,14 @@ and replays as a faint afterimage pacing you through the run. S9 added
 heard-feedback: when a listener hears your move you get ripples + a ring +
 a low thud (see below). S10 added The Halls: the game opens on a level-select
 screen (cards per level, best times, lock ladder: level i opens once i-1 is
-cleared); `L` peeks at it mid-run without losing state.
+cleared); `L` peeks at it mid-run without losing state. S11 added hall 11
+"The Lighthouse": two h4 listeners on PERPENDICULAR streets (top row + left
+column) framing a dark hall no patrol beam reaches; each guard's lured stare
+is the only light for a region the other can never reach (see geometry).
 
 ## How to run / test
 ```
-node --test                 # 38 tests incl. level solvability + replay + ghost
+node --test                 # 42 tests incl. level solvability + replay + ghost
 open index.html             # play (no build step)
 python3 -m http.server -d . 8000   # fallback if file:// is blocked
 ```
@@ -134,7 +137,22 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   logical px through the fitCanvas scale) + `cardAt`. The d-pad gained a
   'halls' button (toggle). allDone tap/L now goes to halls, not level 1.
   Locked cards show "N · locked" — names of unseen halls are not spoiled.
-- 38 tests: cone geometry (exact set + rotation symmetry), beam fan
+- Lighthouse (S11): level 11, two h4 listeners on perpendicular streets —
+  A patrols the top row (cols 3-13), B the left column (rows 2-6); pillars
+  at row 3 cols 2,5,8,11. The hall (rows 4-5 x cols 6-13) is dark in all 63
+  cycle phases. Exclusive lights: the exit (13,5) is lit ONLY by a south
+  stare from column 13 (quarter-disc: col-12/11 stares miss it at d2>16);
+  tile (5,5) is lit ONLY by B's east stare (A's column-5 flash dies on the
+  pillar at (5,3), diagonals are past the disc). Trigger ring: row 5,
+  x=9..12 heard-but-unseen when A is at 13 (x=13 lethal, x=8 out of earshot;
+  x=9 is heard but the tie rule makes the stare go WEST — see geometry).
+  Solver wins in 20 WITHOUT any flash: ride A's wake east along row 1, drop
+  down col 7, walk the dark hall east (soft necessity, same bar as l10).
+  Flash demo string (reveals the exit at turn 31, verified headless):
+  wwwrrrrrrdddrdwrrr + 12xw + r. Halls screen: HALLS_H is gone; hallsH()
+  derives the logical height from ceil(n/2) card rows so the grid grows
+  with the level count (11 cards = 6 rows, footer clear).
+- 42 tests: cone geometry (exact set + rotation symmetry), beam fan
   (coverage-of-clear-line + wall-stop + bounds), turn order, pause
   tells, memory, serialize, listener rules (6), moving-wall theorem control,
   every level solvable + replayed, classifySwipe (2), black-hall design
@@ -142,7 +160,9 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   replay-of-solver-solution on all 10 levels, bump-free path steps), heard
   feedback (3: anyAlerted timing incl. wait-clears + out-of-earshot, watcher
   never alerts, undo round-trip), halls ladder (2: unlockedLevels rung-by-
-  rung + short-array padding, firstOpenLevel incl. all-cleared -> 0).
+  rung + short-array padding, firstOpenLevel incl. all-cleared -> 0),
+  lighthouse design (4: hall dark in all phases, exit lit only by the col-13
+  stare, row-5 trigger ring, (5,5) lit only by the other guard).
 - Renderer verified in headless Firefox for levels 1/4/5/7/9 (start states,
   alerted stare, caught overlay) and level 7 full-solution win overlay
   ("YOU ESCAPED · turn 19") — all with the S5 beam shafts. S6 re-verified
@@ -162,7 +182,12 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
    footer; wasd cursor moves; Enter enters an unlocked card (level 2
    loads) and is a no-op on a locked one; L,L returns to the game refit;
    touch 390px fits the halls grid + new d-pad button. Click/tap hit-test
-   math is code-reviewed only (no headless way to click).
+   math is code-reviewed only (no headless way to click). S11 verified level
+   11 headless: start (two lit streets, black hall), the flash moment
+   (moves=wwwrrrrrrdddrdwrrr+12w+r: south stare down column 13, exit arch
+   lit beside the player, alert ring on player), solver-replay win ("YOU
+   ESCAPED · turn 20 · new best"), and the 11-card halls grid fitting the
+   grown canvas (6 rows, footer clear).
 
 ## Geometry rules for listener levels (hard-won, S2+S4)
 - Beam from a guard reaches rows ±2 (dy=2: dx=±3 in wedge; dy=3 unreachable).
@@ -210,26 +235,40 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   heard-but-unstabbable: the listener turns toward you and CANNOT reach you.
   Lateral 0 at dy=4 is d2=16 -> lethal. This inverts the listener from
   threat to tool and is level 10's core.
+- Wake geometry (S11): coneOf skips dot<0, so the ENTIRE rear half-plane of
+  a guard is dark — not just the dot=0 notch. Riding the wake (following a
+  guard from behind, on its row or the rows beside) is a real road, but you
+  can never pass: the forward diagonals (1,±1) are always lit (45° edge),
+  and at a patrol end the guard flips facing the moment it arrives (the
+  pause tell), so the wake flips sides under the rider — dismount before
+  the turn or die. This is level 11's opening (solver: ride A east along
+  row 1, drop down when the column below is clear).
+- soundFacing tie rule bites the trigger ring (S11): at (dx,dy)=(±4,4) the
+  axis tie goes horizontal, so the guard stares SIDEWAYS, not down — only
+  laterals with |dx| < dy (1..3 at dy=4) produce the column flash. A
+  lateral-4 bait is heard-and-safe but lights the street, not the hall.
 
 ## Next (ranked)
-1. Maybe: a second flash hall that forces the gimmick — e.g. the exit sits
-   where only a flash from a specific far corner reaches it, or two h4
-   listeners where one's stare lights the other's blind spot.
-2. Maybe: a level whose whole gimmick is the dot=0 head-walk trick (level 9
-   uses it in passing; level 10's row-3 notch ride exposes it; a dedicated
-   watcher-only chase hall could make the notch the main road).
+1. Maybe: a wake-ride hall — make the wake the main verb: a guard walks a
+   long circuit and the only safe road is its wake; the player must ride
+   several turns and dismount at the right corner (the wake flips sides at
+   every turn — every corner is a deadline). Level 11 uses the ride as its
+   opening; a dedicated hall could make it the whole puzzle.
+2. Maybe: a chain-flash hall — the only tile from which guard A can be rung
+   sits inside guard B's patrol beam, so the bell must be rung from a moving
+   pocket: two bells timed against each other.
 3. Maybe: atmosphere pass — faint dust motes drifting through the beam
    shafts, or a slight per-tile warm tint on lit floor near the guard.
-4. Maybe: real-device touch pass — if a phone is ever available, check the
-   24px swipe threshold and d-pad reach with a thumb; also consider
-   long-press repeat on the d-pad.
-5. Maybe: ghost polish — a small "ahead/behind" cue (the ghost always draws
-   even when slower; could dim it when behind). The level-select half of this
-   landed in S10 (halls screen shows best times).
-6. Maybe: audio expansion — the heard-thud is the game's only sound. A soft
+4. Maybe: audio expansion — the heard-thud is the game's only sound. A soft
    heartbeat that fades in while a listener is within earshot (before you
    move) would close the loop: it warns you *where* silence is required.
    Only if it adds readability, not for ambience alone.
+5. Maybe: ghost polish — a small "ahead/behind" cue (the ghost always draws
+   even when slower; could dim it when behind). The level-select half of this
+   landed in S10 (halls screen shows best times).
+6. Maybe: real-device touch pass — if a phone is ever available, check the
+   24px swipe threshold and d-pad reach with a thumb; also consider
+   long-press repeat on the d-pad.
 
 ## Dead ends
 - Vertical guard patrols in rooms narrower than ~9 tiles: the ±45°/range-4
@@ -256,6 +295,13 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   an UNBLOCKED one aimed at a noise-maker standing out of the blob's reach
   (hearing 4 > effective diagonal sight) — that's level 10. The blocked-
   stare variant stays dead: light never passes a blocker.
+- "dot=0 notch as a main road" (S11 paper analysis, before any build): the
+  notch is one tile wide, you cannot step forward out of it (the forward
+  diagonal is always lit), and you cannot stay on it through a turn (the
+  guard walks forward out from under you onto that same diagonal). The
+  usable version of the idea is the WAKE (see geometry rules) — that's
+  level 11's opening. The notch itself stays a hiding spot and crossing
+  gate (level 9's head-walk), not a highway.
 - S2's note "diagonal k=3 is in the cone" was WRONG (see S3 note in git
   history): range check excluded (3,3)/(4,4); the S3 fix only added the
   45° tiles at distance 1-2.
@@ -337,3 +383,17 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   the next uncleared hall, not on 1 — by-design, now pinned). Headless-
   verified: fresh-profile ladder, post-win best display, mid-run peek,
   Enter on unlocked/locked cards, L,L round-trip, 390px touch layout.
+- S11 (2026-11-18): Hall 11 "The Lighthouse" — the second flash hall, with
+  two h4 listeners on PERPENDICULAR streets (top row + left column) so each
+  guard's lured stare is the only light for a region the other can never
+  reach: the exit (13,5) only lights from a south stare at column 13; tile
+  (5,5) only from the left guard's east stare (the pillar at (5,3) kills
+  the top guard's column-5 flash, the quarter-disc kills the diagonals).
+  4 design-inspection tests -> 42. The solver's 20-turn solution surprised
+  me by riding the top guard's WAKE east along its own street — which led
+  to the wake-geometry notes (rear half-plane is dark; you can ride but
+  never pass; the turn flips the wake under you) and killed the "dot=0
+  notch as main road" idea on paper before it cost a build. Found the
+  halls screen had a fixed 500px height that the 11th card overflowed;
+  hallsH() now derives it from the level count. Headless-verified start,
+  flash moment, win, and the grown halls grid.
