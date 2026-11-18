@@ -11,8 +11,7 @@
   'use strict';
 
   var CONE_RADIUS = 4;
-  var CONE_COS = Math.SQRT1_2; // ±45° wedge
-  var TOUCH_RADIUS = 1;        // you can feel walls one tile around you
+  var TOUCH_RADIUS = 1; // you can feel walls one tile around you
 
   // ---------- level parsing ----------
 
@@ -107,13 +106,18 @@
   function coneOf(state, guard) {
     var out = [{ x: guard.x, y: guard.y }];
     var f = guard.facing;
+    var f2 = f.x * f.x + f.y * f.y;
     for (var dy = -CONE_RADIUS; dy <= CONE_RADIUS; dy++) {
       for (var dx = -CONE_RADIUS; dx <= CONE_RADIUS; dx++) {
         if (dx === 0 && dy === 0) continue;
-        var d = Math.sqrt(dx * dx + dy * dy);
-        if (d > CONE_RADIUS) continue;
-        var dot = (dx * f.x + dy * f.y) / d;
-        if (dot < CONE_COS) continue;
+        var d2 = dx * dx + dy * dy;
+        if (d2 > CONE_RADIUS * CONE_RADIUS) continue;
+        var dot = dx * f.x + dy * f.y;
+        if (dot < 0) continue;
+        // Exact ±45° wedge with the diagonal edge INCLUDED: the float test
+        // dot/d >= 1/sqrt(2) squared into integers, so edge tiles (|dx|==|dy|)
+        // are lit at every distance instead of flickering with float noise.
+        if (2 * dot * dot < d2 * f2) continue;
         var x = guard.x + dx, y = guard.y + dy;
         if (isWall(state, x, y)) continue;
         if (!lineClear(state, guard.x, guard.y, x, y)) continue;

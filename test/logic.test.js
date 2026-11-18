@@ -57,6 +57,62 @@ test('cone: walls block line of sight', () => {
   assert.ok(!has(4, 2), 'wall at (3,2) blocks the tile behind it');
 });
 
+// Exact integer wedge: the 45° diagonal edge tiles are lit at every distance
+// that fits in range (d2 <= 16), so the wedge has no float-noise notches.
+test('cone: exact tile set for an east-facing guard (edges included)', () => {
+  const lvl = testLevel({ guards: [{ route: [[4, 2]] }] });
+  const st = G.createGame(lvl);
+  const cone = G.coneOf(st, st.guards[0]);
+  const got = cone.map(t => t.x + ',' + t.y).sort();
+  // Room floor is x=1..9, y=1..5; walls clip the wedge at the borders.
+  const want = [
+    '4,2', // own tile
+    '5,1', '5,2', '5,3', // dx=1: diagonal edges included
+    '6,1', '6,2', '6,3', '6,4', // dx=2: (6,0) is wall
+    '7,1', '7,2', '7,3', '7,4', // dx=3: (7,5) out of range (d2=18)
+    '8,2' // dx=4: only straight ahead fits
+  ].sort();
+  assert.deepStrictEqual(got, want);
+});
+
+test('cone: wedge is rotation-symmetric across the four facings', () => {
+  const open = {
+    name: 'open',
+    grid: [
+      '#############',
+      '#P..........#',
+      '#...........#',
+      '#...........#',
+      '#...........#',
+      '#...........#',
+      '#...........#',
+      '#...........#',
+      '#...........#',
+      '#...........#',
+      '#...........#',
+      '#..........E#',
+      '#############'
+    ],
+    guards: [{ route: [[6, 6]] }]
+  };
+  const st = G.createGame(open);
+  const rel = (set) => set.map(t => (t.x - 6) + ',' + (t.y - 6)).sort();
+  const east = rel(G.coneOf(st, { x: 6, y: 6, facing: { x: 1, y: 0 } }));
+  assert.ok(east.length > 10, 'sanity: east cone is non-trivial');
+  for (const [f, map] of [
+    [{ x: 0, y: -1 }, (x, y) => [-y, x]],   // north -> east
+    [{ x: -1, y: 0 }, (x, y) => [-x, -y]],  // west -> east
+    [{ x: 0, y: 1 }, (x, y) => [y, -x]]     // south -> east
+  ]) {
+    const r = rel(G.coneOf(st, { x: 6, y: 6, facing: f })).map(s => {
+      const [x, y] = s.split(',').map(Number);
+      const [nx, ny] = map(x, y);
+      return nx + ',' + ny;
+    }).sort();
+    assert.deepStrictEqual(r, east, 'facing ' + JSON.stringify(f) + ' matches east rotated');
+  }
+});
+
 test('guards: pause tiles make the guard look where it will walk next', () => {
   const lvl = testLevel({
     guards: [{ route: [[7, 2], [8, 2], [8, 2], [8, 2], [7, 2]] }]
@@ -268,20 +324,22 @@ test('soundFacing: larger axis wins, horizontal breaks ties', () => {
 });
 
 test('listener: solver model matches the live game (replay wins)', () => {
-  // The lanes are the two edge rows, two rows off the patrol row: the beam
-  // only grazes them at the wedge edges, so a timed dash east works. The
-  // BFS must model hearing to find it and the replay must survive it.
+  // Player starts one row below the patrol row with hearing 2, so early
+  // moves are heard and the stare sweeps the beam across the adjacent row
+  // (now including the diagonal edge tiles). The solution ducks to the far
+  // lane, dashes east, and climbs back at the exit. The BFS must model
+  // hearing to survive the start and the replay must match it.
   const lvl = testLevel({
     grid: [
       '#########',
+      '#.......#',
+      '#.......#',
       '#P.....E#',
-      '#.......#',
-      '#.......#',
       '#.......#',
       '#.......#',
       '#########'
     ],
-    guards: [{ route: ping(3, 3, 6, 3, 1), type: 'listener', hearing: 1 }]
+    guards: [{ route: ping(3, 2, 6, 2, 1), type: 'listener', hearing: 2 }]
   });
   const path = G.solve(lvl);
   assert.ok(path, 'should be solvable');
