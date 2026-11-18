@@ -1,0 +1,25 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "halogen": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Halogen",
+      "options": {
+        "baseURL": "http://localhost:8731/v1"
+      },
+      "models": {
+        "halogen-qwen3.8-flash-next": {
+          "name": "Qwen3.8 Flash Next (Halogen)",
+          "tool_call": true,
+          "reasoning": true,
+          "limit": { "context": 262144, "output": 32000 }
+        }
+      }
+    }
+  },
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "webfetch": "deny"
+  }
+}
