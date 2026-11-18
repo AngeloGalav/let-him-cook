@@ -113,6 +113,111 @@ test('cone: wedge is rotation-symmetric across the four facings', () => {
   }
 });
 
+// ---------- beam fan (rendering geometry) ----------
+
+// Ray-cast point-in-polygon, for checking the fan covers the real cone.
+function inPoly(px, py, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i], [xj, yj] = pts[j];
+    if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+// The fairness contract: every lethal tile with a wall-free line from the
+// guard must be covered by the drawn glow — or have the glow's edge cross
+// it, for tiles sitting on the 45° diagonal where the straight beam edge
+// cuts through the tile instead of swallowing it (the exact per-tile floor
+// lighting always marks the lethal set; see NOTES). Tiles the logic lights
+// only through lineClear's rounding quirks are skipped: no radial fan can
+// reach them. Checked at every guard phase of every shipped level. Probe
+// points are pulled 10% toward the guard to dodge flaky exact-edge tests.
+test('coneFan: covers every cone tile with a clear line of sight', () => {
+  // fine-sample the guard->tile-centre line; true if no sample lands in a wall
+  function pathClear(st, cx, cy, tx, ty) {
+    const d = Math.hypot(tx - cx, ty - cy);
+    for (let t = 0; t <= d; t += 0.05) {
+      const x = cx + (tx - cx) * (t / d), y = cy + (ty - cy) * (t / d);
+      if (G.isWall(st, Math.floor(x), Math.floor(y))) return false;
+    }
+    return true;
+  }
+  // distance from point to segment, for the edge-crossing tolerance
+  function distSeg(px, py, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay;
+    const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
+    return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+  }
+  function covered(px, py, poly) {
+    if (inPoly(px, py, poly)) return true;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      if (distSeg(px, py, poly[j][0], poly[j][1], poly[i][0], poly[i][1]) < 0.3) return true;
+    }
+    return false;
+  }
+  for (const lvl of LEVELS) {
+    const st = G.createGame(lvl);
+    const cycle = G.cycleLength(lvl);
+    for (let gi = 0; gi < lvl.guards.length; gi++) {
+      for (let t = 0; t < cycle; t++) {
+        const pos = G.guardAt(lvl, gi, t);
+        const fan = G.coneFan(st, pos);
+        // The renderer's polygon is the fan apex plus the ring.
+        const poly = [[fan.cx, fan.cy], ...fan.points];
+        for (const tile of G.coneOf(st, pos)) {
+          let px, py;
+          if (tile.x === pos.x && tile.y === pos.y) {
+            // own tile: its centre IS the apex, so probe just ahead of it
+            px = fan.cx + pos.facing.x * 0.2;
+            py = fan.cy + pos.facing.y * 0.2;
+          } else {
+            px = fan.cx + 0.9 * (tile.x + 0.5 - fan.cx);
+            py = fan.cy + 0.9 * (tile.y + 0.5 - fan.cy);
+            if (!pathClear(st, fan.cx, fan.cy, tile.x + 0.5, tile.y + 0.5)) continue;
+          }
+          assert.ok(covered(px, py, poly),
+            lvl.name + ' guard ' + gi + ' turn ' + t +
+            ': tile ' + tile.x + ',' + tile.y + ' not covered by fan');
+        }
+      }
+    }
+  }
+});
+
+test('coneFan: stops at the wall face, never leaks behind it', () => {
+  const lvl = testLevel({
+    grid: [
+      '#########',
+      '#P..#..E#',
+      '#########'
+    ],
+    guards: [{ route: [[2, 1]] }] // stationary, faces east into the wall at x=4
+  });
+  const st = G.createGame(lvl);
+  const fan = G.coneFan(st, st.guards[0]);
+  for (const [x, y] of fan.points) {
+    assert.ok(x < 4.05, 'fan vertex ' + x + ',' + y + ' past the wall face');
+  }
+  assert.ok(inPoly(3.5, 1.5, [[fan.cx, fan.cy], ...fan.points]),
+    'tile before the wall is covered');
+});
+
+test('coneFan: stays inside the widened wedge (no runaway spikes)', () => {
+  const lvl = testLevel({ guards: [{ route: [[4, 2]] }] });
+  const st = G.createGame(lvl);
+  const fan = G.coneFan(st, st.guards[0]);
+  const base = 0; // east
+  for (const [x, y] of fan.points) {
+    const r = Math.hypot(x - fan.cx, y - fan.cy);
+    let da = Math.atan2(y - fan.cy, x - fan.cx) - base;
+    while (da > Math.PI) da -= 2 * Math.PI;
+    while (da < -Math.PI) da += 2 * Math.PI;
+    assert.ok(r <= G.CONE_RADIUS + 0.65, 'vertex too far: r=' + r);
+    assert.ok(Math.abs(da) <= Math.PI / 4 + 0.11, 'vertex outside wedge: ' + da);
+  }
+});
+
 test('guards: pause tiles make the guard look where it will walk next', () => {
   const lvl = testLevel({
     guards: [{ route: [[7, 2], [8, 2], [8, 2], [8, 2], [7, 2]] }]

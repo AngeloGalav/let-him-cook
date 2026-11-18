@@ -131,6 +131,37 @@
     return state.guards.map(function (g) { return coneOf(state, g); });
   }
 
+  // Smooth beam outline for rendering: a polygon fan raycast from the
+  // guard's centre across a slightly-widened ±45° wedge. Rays march outward
+  // and stop at the first wall face, so the beam reads as a straight-edged
+  // light shaft with clean shadows behind pillars and walls. It is a glow,
+  // not the kill zone: the exact lethal tiles are the per-tile floor
+  // lighting (visibleNow 'light'). The widening and the extra range past
+  // the boundary-tile edges keep the glow covering the lethal tiles it
+  // reaches; tiles the logic lights only through rounding quirks (grazing a
+  // wall corner, or lighting past an unlit tile) are carried by the floor
+  // lighting too. Returns { cx, cy, points: [[x, y], ...] } in tile units.
+  function coneFan(state, guard) {
+    var cx = guard.x + 0.5, cy = guard.y + 0.5;
+    var base = Math.atan2(guard.facing.y, guard.facing.x);
+    var HALF = Math.PI / 4 + 0.06;        // a hair past the 45° edge tiles
+    var R = CONE_RADIUS + 0.6;            // reach the far edge of boundary tiles
+    var RAYS = 96, STEP = 0.04;
+    var points = [];
+    for (var ri = 0; ri <= RAYS; ri++) {
+      var a = base - HALF + (2 * HALF) * ri / RAYS;
+      var dx = Math.cos(a), dy = Math.sin(a);
+      var t = 0, lastIn = 0;
+      while (t <= R) {
+        if (isWall(state, Math.floor(cx + dx * t), Math.floor(cy + dy * t))) break;
+        lastIn = t;
+        t += STEP;
+      }
+      points.push([cx + dx * lastIn, cy + dy * lastIn]);
+    }
+    return { cx: cx, cy: cy, points: points };
+  }
+
   function inCone(state, x, y) {
     var cs = cones(state);
     for (var i = 0; i < cs.length; i++) {
@@ -441,6 +472,7 @@
     isWall: isWall,
     coneOf: coneOf,
     cones: cones,
+    coneFan: coneFan,
     inCone: inCone,
     hears: hears,
     soundFacing: soundFacing,

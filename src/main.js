@@ -96,7 +96,7 @@
     var w = game.w * TILE, h = game.h * TILE;
     ctx.clearRect(0, 0, w, h);
     var vis = G.visibleNow(game);
-    var pulse = 0.16 + 0.05 * Math.sin(now / 320);
+    var glow = 0.30 + 0.07 * Math.sin(now / 320);
 
     for (var y = 0; y < game.h; y++) {
       for (var x = 0; x < game.w; x++) {
@@ -107,7 +107,7 @@
         var px = x * TILE, py = y * TILE;
         var wall = G.isWall(game, x, y);
         if (v === 'light') {
-          ctx.fillStyle = wall ? '#3a4258' : '#161a27';
+          ctx.fillStyle = wall ? '#454d66' : '#20242f';
           ctx.fillRect(px, py, TILE, TILE);
         } else if (v === 'touch') {
           ctx.fillStyle = wall ? '#2c3348' : '#10131d';
@@ -128,15 +128,30 @@
       }
     }
 
-    // beams: the light that is also the blade
-    for (var y2 = 0; y2 < game.h; y2++) {
-      for (var x2 = 0; x2 < game.w; x2++) {
-        if (vis[x2 + ',' + y2] === 'light' && !G.isWall(game, x2, y2)) {
-          ctx.fillStyle = 'rgba(255,190,90,' + pulse.toFixed(3) + ')';
-          ctx.fillRect(x2 * TILE, y2 * TILE, TILE, TILE);
-        }
+    // beams: smooth light shafts — the light that is also the blade.
+    // Additive fill so overlapping beams brighten like real light, and the
+    // amber reads as glow instead of muddy brown over the dark floor.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.filter = 'blur(5px)'; // melt the tile-staircase edges into a soft glow
+    for (var bi = 0; bi < game.guards.length; bi++) {
+      var bg = game.guards[bi];
+      var fan = G.coneFan(game, bg);
+      var gcx = fan.cx * TILE, gcy = fan.cy * TILE;
+      ctx.beginPath();
+      ctx.moveTo(gcx, gcy);
+      for (var pi = 0; pi < fan.points.length; pi++) {
+        ctx.lineTo(fan.points[pi][0] * TILE, fan.points[pi][1] * TILE);
       }
+      ctx.closePath();
+      var grad = ctx.createRadialGradient(gcx, gcy, TILE * 0.3, gcx, gcy, TILE * (G.CONE_RADIUS + 0.6));
+      grad.addColorStop(0, 'rgba(255,206,110,' + Math.min(1, glow * 1.7).toFixed(3) + ')');
+      grad.addColorStop(0.5, 'rgba(255,176,64,' + glow.toFixed(3) + ')');
+      grad.addColorStop(1, 'rgba(255,150,40,0)');
+      ctx.fillStyle = grad;
+      ctx.fill();
     }
+    ctx.restore();
 
     // guards: always visible — their own tile is inside their own gaze
     for (var gi = 0; gi < game.guards.length; gi++) {
