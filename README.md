@@ -53,6 +53,12 @@ move script (`r` `l` `u` `d` `w`): `index.html?level=5&moves=rdw`.
   is a legitimate move, and later halls demand it.
 - Reach the green door. Nine halls, escalating.
 
+On a phone or tablet the controls adapt: **swipe** to move, **tap** to wait,
+and an on-screen d-pad with undo/restart appears below the board. On the
+caught/escaped screens a single tap restarts or advances, so a run is fully
+playable without a keyboard. (To preview the touch layout on a desktop
+browser, add `?touch=1` to the URL.)
+
 ## The rules of the world
 
 - Guards walk fixed cyclic routes; a paused guard looks where it will walk

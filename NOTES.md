@@ -16,7 +16,7 @@ beat; solver models it with one alert bit per listener in the BFS state).
 
 ## How to run / test
 ```
-node --test                 # 23 tests incl. level solvability + replay
+node --test                 # 25 tests incl. level solvability + replay
 open index.html             # play (no build step)
 python3 -m http.server -d . 8000   # fallback if file:// is blocked
 ```
@@ -25,7 +25,8 @@ Headless screenshot verification (works, used every session):
 firefox --profile /tmp/ffprofile -no-remote --screenshot /tmp/x.png \
   --window-size 900,820 'file:///.../index.html?level=5&moves=dd'
 ```
-URL hooks in main.js: `?level=N` (1-based), `?moves=rlduw...` auto-played.
+URL hooks in main.js: `?level=N` (1-based), `?moves=rlduw...` auto-played,
+`?touch=1` forces the touch UI (d-pad + touch help) on a desktop browser.
 Use a dedicated profile — the user's Firefox is usually running.
 Solver-path → moves-string one-liner lives in the S4 commit workflow:
 `node -e` over LEVELS + solve(), map wait/r/l/d/u.
@@ -37,6 +38,14 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   reveal memory, undo, 9 solvable levels, canvas renderer with smooth
   raycast beam shafts (S5), violet listeners with sound-ring when alerted,
   caught/won/done overlays.
+- Mobile (S6): canvas scales to viewport width (backing store = display px ×
+  dpr, re-fit on resize); touch on canvas = swipe-to-move / tap-to-wait, and
+  tap on caught/won/done overlays restarts or advances (fully keyboard-free);
+  on-screen d-pad + undo/restart shown for `(pointer: coarse)` or `?touch=1`;
+  help text and overlay hints swap to touch wording. `classifySwipe(dx,dy,th?)`
+  in logic.js (pure): dominant axis wins, tie→horizontal, <th (default 24px)
+  is a tap. NOT yet exercised by a real finger — classifier unit-tested,
+  layout screenshot-tested only.
 - Beam rendering (S5): `G.coneFan(state, guard)` (pure, in logic.js)
   raycasts 97 rays across a ±(45°+0.06) wedge from the guard centre,
   stopping at the first wall face; renderer fills the polygon with an
@@ -59,13 +68,15 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
     ±45° wedge); the listener half forces shadow play.
   - New regression test: identical room with vs without pillars — bare room
     UNSOLVABLE, pillared room solvable + replay. Pillars are load-bearing.
-- 23 tests: cone geometry (exact set + rotation symmetry), beam fan
+- 25 tests: cone geometry (exact set + rotation symmetry), beam fan
   (coverage-of-clear-line + wall-stop + bounds), turn order, pause
   tells, memory, serialize, listener rules (6), moving-wall theorem control,
-  every level solvable + replayed.
+  every level solvable + replayed, classifySwipe (2).
 - Renderer verified in headless Firefox for levels 1/4/5/7/9 (start states,
   alerted stare, caught overlay) and level 7 full-solution win overlay
-  ("YOU ESCAPED · turn 19") — all with the S5 beam shafts.
+  ("YOU ESCAPED · turn 19") — all with the S5 beam shafts. S6 re-verified
+  level 1 desktop (start + win) unchanged, and phone 390×844 (start/win/caught)
+  with the d-pad and touch help.
 
 ## Geometry rules for listener levels (hard-won, S2+S4)
 - Beam from a guard reaches rows ±2 (dy=2: dx=±3 in wedge; dy=3 unreachable).
@@ -103,19 +114,21 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   tiles. Don't try to "fix" lineClear — levels are balanced around it.
 
 ## Next (ranked)
-1. Mobile: on-screen d-pad + swipe; turn-based so it fits phones.
-2. "Stare as a light source" level: make noise behind cover so the
+1. "Stare as a light source" level: make noise behind cover so the
    listener's blocked stare lights a dark corridor you need to see into.
    NOTE: the solver can't verify the player NEEDS the light (it has full
    info) — verify by design inspection: target region must be dark unless
    the listener is staring at the noise-maker.
-3. "Ghost" of your best run (fewest turns) as a faint afterimage.
-4. Sound-detection feedback: subtle audio cue or screen-edge flash when a
+2. "Ghost" of your best run (fewest turns) as a faint afterimage.
+3. Sound-detection feedback: subtle audio cue or screen-edge flash when a
    listener hears you (currently the ring is the only tell).
-5. Maybe: a level whose whole gimmick is the dot=0 head-walk trick (level 9
+4. Maybe: a level whose whole gimmick is the dot=0 head-walk trick (level 9
    uses it in passing; a dedicated hall could be a watcher-only chase).
-6. Maybe: atmosphere pass — faint dust motes drifting through the beam
+5. Maybe: atmosphere pass — faint dust motes drifting through the beam
    shafts, or a slight per-tile warm tint on lit floor near the guard.
+6. Maybe: real-device touch pass — if a phone is ever available, check the
+   24px swipe threshold and d-pad reach with a thumb; also consider
+   long-press repeat on the d-pad.
 
 ## Dead ends
 - Vertical guard patrols in rooms narrower than ~9 tiles: the ±45°/range-4
@@ -180,3 +193,9 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   unlit one); settled the render contract: glow = atmosphere, floor
   lighting = exact kill zone. 3 new fan tests incl. all-levels/all-phases
   coverage. Screenshots re-verified: 1/4/5/7/9 + win + alerted stare.
+- S6 (2026-11-18): Mobile support: responsive canvas (fitCanvas, re-fit on
+  resize), swipe/tap on canvas (classifySwipe in logic.js, 2 tests -> 25),
+  on-screen d-pad + undo/restart for coarse pointers or ?touch=1, touch-mode
+  help and overlay wording (tap to restart / next). Tap-on-canvas resolves
+  end-of-run overlays so runs are keyboard-free. Verified headless: desktop
+  start/win unchanged, phone 390x844 start/win/caught with d-pad.
