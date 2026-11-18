@@ -107,6 +107,24 @@
         { route: ping(9, 1, 9, 8, 1, 1) },
         { route: ping(15, 1, 15, 8, 1) }
       ]
+    },
+    {
+      name: '5 · The Listening Post',
+      hint: 'The violet guard hears you move. The edge rows are out of earshot — let it walk west, then descend.',
+      grid: [
+        '##############',
+        '#P...........#',
+        '#............#',
+        '#............#',
+        '#............#',
+        '#............#',
+        '#............#',
+        '#...........E#',
+        '##############'
+      ],
+      guards: [
+        { route: ping(2, 4, 11, 4, 1), type: 'listener', hearing: 2 }
+      ]
     }
   ];
 

@@ -142,11 +142,20 @@
     for (var gi = 0; gi < game.guards.length; gi++) {
       var g = game.guards[gi];
       var cx = g.x * TILE + TILE / 2, cy = g.y * TILE + TILE / 2;
-      ctx.fillStyle = '#ff6b6b';
+      // a listener that just heard you: sound rings, then the stare
+      if (g.alerted) {
+        var ring = 11 + 3 * Math.sin(now / 150);
+        ctx.strokeStyle = 'rgba(192,132,252,0.55)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, ring, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.fillStyle = g.type === 'listener' ? '#c084fc' : '#ff6b6b';
       ctx.beginPath();
       ctx.arc(cx, cy, 9, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = '#2a0d0d';
+      ctx.strokeStyle = g.type === 'listener' ? '#231038' : '#2a0d0d';
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(cx, cy);
@@ -199,6 +208,20 @@
     requestAnimationFrame(draw);
   }
 
-  loadLevel(0);
+  // URL test hooks for headless verification: ?level=N (1-based) selects a
+  // level, ?moves=rlduw... auto-plays a move script on load.
+  var params = new URLSearchParams(window.location.search);
+  var start = parseInt(params.get('level'), 10);
+  start = isNaN(start) ? 1 : Math.min(Math.max(start, 1), LEVELS.length);
+  loadLevel(start - 1);
+  var moves = params.get('moves') || '';
+  for (var mi = 0; mi < moves.length; mi++) {
+    var m = moves[mi];
+    if (m === 'r') act({ dx: 1, dy: 0 });
+    else if (m === 'l') act({ dx: -1, dy: 0 });
+    else if (m === 'u') act({ dx: 0, dy: -1 });
+    else if (m === 'd') act({ dx: 0, dy: 1 });
+    else if (m === 'w') act({ wait: true });
+  }
   draw(0); // paint the first frame synchronously; draw() re-arms rAF itself
 })();
