@@ -1035,6 +1035,55 @@ test('heard: anyAlerted survives the undo round-trip', () => {
   assert.strictEqual(G.anyAlerted(st), true, 'undo restores the heard state');
 });
 
+// ---------- earshot (heartbeat cue) ----------
+
+test('earshot: 0 for watchers and outside every listener range', () => {
+  const w = G.createGame(heardLevel('watcher'));
+  assert.strictEqual(G.earshot(w), 0, 'watchers have no ears');
+  const st = G.createGame(heardLevel('listener')); // listener (5,3), h3
+  st.player = { x: 1, y: 1 }; // Chebyshev 4 from (5,3) -> silent
+  assert.strictEqual(G.earshot(st), 0);
+  st.player = { x: 2, y: 3 }; // distance 3 -> the very edge of hearing
+  assert.ok(G.earshot(st) > 0, 'edge of earshot still counts');
+});
+
+test('earshot: rises monotonically toward the listener, stays 0..1', () => {
+  const st = G.createGame(heardLevel('listener')); // listener (5,3), h3
+  let prev = 0;
+  for (let x = 2; x <= 4; x++) { // x=2 is the edge of hearing (d=3)
+    st.player = { x: x, y: 3 };
+    const e = G.earshot(st);
+    assert.ok(e > prev, 'closer means louder at x=' + x);
+    prev = e;
+  }
+  assert.ok(prev <= 1, 'proximity stays within 0..1');
+});
+
+test('earshot: walls do not muffle — it matches hears tile for tile', () => {
+  const st = G.createGame(heardLevel('listener')); // wall column at x=3
+  const g = st.guards[0];
+  for (let x = 1; x <= 9; x++) {
+    for (let y = 1; y <= 5; y++) {
+      st.player = { x: x, y: y };
+      assert.strictEqual(G.earshot(st) > 0, G.hears(g, x, y),
+        'earshot agrees with hears at ' + x + ',' + y);
+    }
+  }
+});
+
+test('earshot: the nearest listener wins when two overlap', () => {
+  const st = G.createGame(testLevel({
+    guards: [
+      { route: [[3, 1]], type: 'listener', hearing: 2 },
+      { route: [[8, 1]], type: 'listener', hearing: 4 }
+    ]
+  }));
+  st.player = { x: 4, y: 1 }; // 1 from the h2 (2/3), 4 from the h4 (1/5)
+  assert.ok(Math.abs(G.earshot(st) - 2 / 3) < 1e-9);
+  st.player = { x: 6, y: 1 }; // 3 from the h2 (out), 2 from the h4 (3/5)
+  assert.ok(Math.abs(G.earshot(st) - 3 / 5) < 1e-9);
+});
+
 // ---------- halls screen (level-select ladder) ----------
 
 test('halls: level 0 always open, level i opens once i-1 is cleared', () => {

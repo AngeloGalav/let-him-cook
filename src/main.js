@@ -82,6 +82,43 @@
     toastUntil = performance.now() + 1400;
   }
 
+  // ---------- sound: the heartbeat (you are inside earshot) ----------
+  // The thud tells you a move was heard; this warns BEFORE you move: while
+  // any listener could hear your next step (G.earshot > 0), a soft lub-dub
+  // ticks at a rate and volume that scale with proximity. Readability, not
+  // ambience: it marks the silent zones before you spend a move in one.
+  // Same gesture-gated, try/catch'd context as the thud; mute stops it live.
+
+  var hbNext = 0; // performance.now() of the next lub-dub, 0 = not scheduled
+
+  function lub(t, vol) {
+    var o = audioCtx.createOscillator(), gn = audioCtx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(64, t);
+    o.frequency.exponentialRampToValueAtTime(41, t + 0.09);
+    gn.gain.setValueAtTime(0.0001, t);
+    gn.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    o.connect(gn);
+    gn.connect(audioCtx.destination);
+    o.start(t);
+    o.stop(t + 0.16);
+  }
+
+  function heartbeat(level) { // level: earshot proximity in (0, 1]
+    if (muted || !userGestured) return;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!audioCtx) audioCtx = new AC();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      var t = audioCtx.currentTime;
+      var vol = 0.04 + 0.12 * level;
+      lub(t, vol);
+      lub(t + 0.16, vol * 0.65); // the dub, softer than the lub
+    } catch (e) { /* no audio: the visual cues still play */ }
+  }
+
   // ---------- best-run storage (the ghost) ----------
   // localStorage can be missing or throw (private mode, blocked file://), so
   // every access is wrapped: no storage simply means no ghost.
@@ -568,6 +605,21 @@
     ctx.arc(pcx, pcy, 7, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+
+    // heartbeat: while you stand inside a listener's earshot, a lub-dub
+    // ticks faster and louder the deeper in the zone you are — the warning
+    // that your NEXT move would be heard. State-derived, so undo, mute, and
+    // escaping all stop it for free.
+    var ear = G.earshot(game);
+    if (game.status === 'playing' && ear > 0 && !muted && userGestured) {
+      if (hbNext === 0) hbNext = now + 200; // first beat lands quickly
+      if (now >= hbNext) {
+        heartbeat(ear);
+        hbNext = now + 1500 - 950 * ear; // ~1.5s at the edge, ~0.55s deep in
+      }
+    } else {
+      hbNext = 0;
+    }
 
     // heard feedback, persistent half: while a listener is still staring at
     // your last footstep, a slow violet ring stays on you. It reads as "that

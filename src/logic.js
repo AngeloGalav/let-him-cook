@@ -268,6 +268,26 @@
     return false;
   }
 
+  // Renderer cue helper: how deep the player currently sits inside a
+  // listener's earshot — i.e. whether their NEXT move would be heard. 0 when
+  // no listener can hear them; otherwise a 0..1 proximity for the nearest
+  // listener: 1/(h+1) at the very edge of hearing, h/(h+1) when adjacent.
+  // Walls are ignored (sound passes through), matching `hears`. This is the
+  // "silence required" signal that drives the heartbeat sound.
+  function earshot(state) {
+    var best = 0;
+    for (var i = 0; i < state.guards.length; i++) {
+      var g = state.guards[i];
+      if (g.type !== 'listener') continue;
+      var d = Math.max(Math.abs(state.player.x - g.x), Math.abs(state.player.y - g.y));
+      if (d <= g.hearing) {
+        var p = (g.hearing + 1 - d) / (g.hearing + 1);
+        if (p > best) best = p;
+      }
+    }
+    return best;
+  }
+
   // ---------- turn resolution ----------
 
   // action: {dx, dy}, or {wait: true} to pass.
@@ -576,6 +596,7 @@
     hears: hears,
     soundFacing: soundFacing,
     anyAlerted: anyAlerted,
+    earshot: earshot,
     visibleNow: visibleNow,
     takeTurn: takeTurn,
     guardAt: guardAt,
