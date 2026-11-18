@@ -186,6 +186,110 @@ test('serialize/restore round-trips state', () => {
   assert.strictEqual(st.turn, before.turn);
 });
 
+// ---------- listeners: guards that turn toward nearby movement ----------
+
+// Room with a wall at (3,1): a listener at (5,1) can hear the player at
+// (2,1) but its turned beam is blocked by the wall.
+function listenerLevel(extra) {
+  return testLevel(Object.assign({
+    grid: [
+      '#########',
+      '#P.#....#',
+      '#.......#',
+      '#......E#',
+      '#########'
+    ],
+    guards: [{ route: [[5, 1]], type: 'listener', hearing: 3 }]
+  }, extra));
+}
+
+test('listener: a move in earshot makes it snap to face the sound', () => {
+  const st = G.createGame(listenerLevel());
+  const g = st.guards[0];
+  assert.strictEqual(g.alerted, false);
+  assert.deepStrictEqual(g.facing, { x: 1, y: 0 }); // stationary guard: east
+  // step east into (2,1): 3 tiles away -> heard, wall blocks the stare
+  const consumed = G.takeTurn(st, { dx: 1, dy: 0 });
+  assert.strictEqual(consumed, true);
+  assert.strictEqual(st.status, 'playing', 'wall blocks the turned beam');
+  assert.strictEqual(g.alerted, true);
+  assert.deepStrictEqual(g.facing, { x: -1, y: 0 }); // faced west toward (2,1)
+  assert.ok(st.revealed['4,1'], 'the stare lit the floor between the walls');
+});
+
+test('listener: the stare clears on its next step; waiting is silent', () => {
+  const st = G.createGame(listenerLevel());
+  const g = st.guards[0];
+  G.takeTurn(st, { dx: 1, dy: 0 }); // heard, stared west
+  assert.strictEqual(g.alerted, true);
+  G.takeTurn(st, { wait: true }); // wait makes no sound; step resets facing
+  assert.strictEqual(g.alerted, false);
+  assert.deepStrictEqual(g.facing, { x: 1, y: 0 });
+});
+
+test('listener: a move out of earshot makes no sound', () => {
+  const st = G.createGame(testLevel({
+    grid: [
+      '##########',
+      '#P......E#',
+      '##########'
+    ],
+    guards: [{ route: [[7, 1]], type: 'listener', hearing: 2 }]
+  }));
+  const g = st.guards[0];
+  G.takeTurn(st, { dx: 1, dy: 0 }); // (2,1): 5 away > hearing 2
+  assert.strictEqual(g.alerted, false);
+  assert.deepStrictEqual(g.facing, { x: 1, y: 0 });
+});
+
+test('listener: turning toward a move with line of sight is fatal', () => {
+  const st = G.createGame(testLevel({
+    grid: [
+      '#########',
+      '#P.....E#',
+      '#########'
+    ],
+    guards: [{ route: [[5, 1]], type: 'listener', hearing: 3 }]
+  }));
+  // (2,1) is 3 away: heard. The east-facing beam never touched (2,1), but
+  // the listener turns west and the stare sweeps the player up.
+  G.takeTurn(st, { dx: 1, dy: 0 });
+  assert.strictEqual(st.status, 'caught');
+});
+
+test('soundFacing: larger axis wins, horizontal breaks ties', () => {
+  const g = { x: 5, y: 3, facing: { x: 1, y: 0 } };
+  assert.deepStrictEqual(G.soundFacing(g, 8, 4), { x: 1, y: 0 }); // east
+  assert.deepStrictEqual(G.soundFacing(g, 2, 4), { x: -1, y: 0 }); // west
+  assert.deepStrictEqual(G.soundFacing(g, 6, 6), { x: 0, y: 1 }); // south
+  assert.deepStrictEqual(G.soundFacing(g, 4, 0), { x: 0, y: -1 }); // north
+  assert.deepStrictEqual(G.soundFacing(g, 3, 1), { x: -1, y: 0 }); // diagonal tie -> horizontal
+  assert.deepStrictEqual(G.soundFacing(g, 5, 3), { x: 1, y: 0 }); // same tile: keep facing
+});
+
+test('listener: solver model matches the live game (replay wins)', () => {
+  // The lanes are the two edge rows, two rows off the patrol row: the beam
+  // only grazes them at the wedge edges, so a timed dash east works. The
+  // BFS must model hearing to find it and the replay must survive it.
+  const lvl = testLevel({
+    grid: [
+      '#########',
+      '#P.....E#',
+      '#.......#',
+      '#.......#',
+      '#.......#',
+      '#.......#',
+      '#########'
+    ],
+    guards: [{ route: ping(3, 3, 6, 3, 1), type: 'listener', hearing: 1 }]
+  });
+  const path = G.solve(lvl);
+  assert.ok(path, 'should be solvable');
+  const st = G.createGame(lvl);
+  for (const a of path) G.takeTurn(st, a);
+  assert.strictEqual(st.status, 'won');
+});
+
 test('every level: routes are valid floor walks', () => {
   for (const lvl of LEVELS) {
     const st = G.createGame(lvl);

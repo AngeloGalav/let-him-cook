@@ -46,7 +46,10 @@
         idx: 0,
         x: route[0].x,
         y: route[0].y,
-        facing: nextFacing(route, route[0], 0, { x: 1, y: 0 })
+        facing: nextFacing(route, route[0], 0, { x: 1, y: 0 }),
+        type: g.type || 'watcher',
+        hearing: g.hearing == null ? 3 : g.hearing,
+        alerted: false
       };
     });
 
@@ -173,7 +176,8 @@
 
   // Guards advance one route step per turn. Facing always points at the next
   // distinct route tile, so a guard pauses (repeated tile) and looks where it
-  // is about to walk — a readable tell for the player.
+  // is about to walk — a readable tell for the player. Stepping also clears
+  // any turn-toward-sound from the previous turn.
   function stepGuard(state, g) {
     g.idx = (g.idx + 1) % g.route.length;
     var next = g.route[g.idx];
@@ -181,7 +185,40 @@
       g.x = next.x;
       g.y = next.y;
     }
-    g.facing = nextFacing(g.route, g, g.idx, g.facing);
+    g.facing = nextFacing(g.route, g, g.idx, { x: 1, y: 0 });
+    g.alerted = false;
+  }
+
+  // ---------- sound ----------
+
+  // A listener hears any *move* (never a wait) within `hearing` tiles
+  // (Chebyshev). Sound passes through walls: you can be heard next door.
+  function hears(g, px, py) {
+    return g.type === 'listener' &&
+      Math.max(Math.abs(px - g.x), Math.abs(py - g.y)) <= g.hearing;
+  }
+
+  // Cardinal direction a guard turns to when it hears a sound at (px,py):
+  // the axis with the larger delta, horizontal wins ties. Same tile: keep
+  // facing (unreachable in play — the guard's own tile is inside its cone).
+  function soundFacing(g, px, py) {
+    var dx = px - g.x, dy = py - g.y;
+    if (dx !== 0 && Math.abs(dx) >= Math.abs(dy)) return { x: Math.sign(dx), y: 0 };
+    if (dy !== 0) return { x: 0, y: Math.sign(dy) };
+    return { x: g.facing.x, y: g.facing.y };
+  }
+
+  // After the guards step, every listener that heard this turn's move snaps
+  // to face the sound. The stare lasts until the listener's next step, so
+  // its beam both threatens and illuminates toward the noise for one beat.
+  function reactToSound(state) {
+    for (var i = 0; i < state.guards.length; i++) {
+      var g = state.guards[i];
+      if (hears(g, state.player.x, state.player.y)) {
+        g.facing = soundFacing(g, state.player.x, state.player.y);
+        g.alerted = true;
+      }
+    }
   }
 
   // ---------- turn resolution ----------
@@ -203,6 +240,7 @@
       return true;
     }
     for (var i = 0; i < state.guards.length; i++) stepGuard(state, state.guards[i]);
+    if (!action.wait) reactToSound(state);
     if (inCone(state, state.player.x, state.player.y)) {
       state.status = 'caught';
       reveal(state);
@@ -248,16 +286,22 @@
 
   function gcd(a, b) { return b ? gcd(b, a % b) : a; }
 
-  // BFS over (player x, y, turn mod cycle). Proves a level is solvable and
-  // returns the shortest action list, or null.
+  // BFS over (player x, y, turn mod cycle, listener alert mask). Proves a
+  // level is solvable and returns the shortest action list, or null.
+  //
+  // The alert mask is one bit per listener: "this listener is currently
+  // staring at the node's player tile because the player moved near it last
+  // turn". The stare direction is fully derived from the node's position,
+  // so the state space stays finite.
   function solve(level, maxStates) {
     maxStates = maxStates || 400000;
     var st = createGame(level);
     var cycle = cycleLength(level);
-    var startKey = st.player.x + ',' + st.player.y + ',0';
+    var nG = level.guards.length;
+    var startKey = st.player.x + ',' + st.player.y + ',0,0';
     var seen = {};
     seen[startKey] = null; // key -> { from, action }
-    var queue = [{ x: st.player.x, y: st.player.y, t: 0 }];
+    var queue = [{ x: st.player.x, y: st.player.y, t: 0, mask: 0 }];
     var actions = [
       { dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 },
       { wait: true }
@@ -266,20 +310,49 @@
     function wall(x, y) {
       return x < 0 || y < 0 || x >= w || y >= h || walls[y][x];
     }
-    // Precompute cones for each guard phase in the cycle.
-    var phaseCones = [];
-    for (var t = 0; t < cycle; t++) {
-      var cs = [];
-      for (var gi = 0; gi < level.guards.length; gi++) {
-        cs.push(coneOf(st, guardAt(level, gi, t)));
-      }
-      phaseCones.push(cs);
+    // Listener bookkeeping: bit index in the alert mask (-1 = not a listener)
+    // and hearing radius.
+    var listenerBit = [], hearing = [];
+    var nListeners = 0;
+    for (var gi0 = 0; gi0 < nG; gi0++) {
+      hearing[gi0] = level.guards[gi0].hearing == null ? 3 : level.guards[gi0].hearing;
+      listenerBit[gi0] = level.guards[gi0].type === 'listener' ? nListeners++ : -1;
     }
-    function lit(x, y, t) {
-      var cs = phaseCones[t % cycle];
-      for (var i = 0; i < cs.length; i++) {
-        for (var j = 0; j < cs[i].length; j++) {
-          if (cs[i][j].x === x && cs[i][j].y === y) return true;
+    // Precompute, for each phase and guard: route position/cone plus the four
+    // cones an alert turn could produce.
+    var DIRS = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+    var phasePos = [], phaseCones = [], phaseDirCones = [];
+    for (var t = 0; t < cycle; t++) {
+      var ps = [], cs = [], ds = [];
+      for (var gi = 0; gi < nG; gi++) {
+        var pg = guardAt(level, gi, t);
+        ps.push(pg);
+        cs.push(coneOf(st, pg));
+        ds.push(DIRS.map(function (d) {
+          return coneOf(st, { x: pg.x, y: pg.y, facing: d });
+        }));
+      }
+      phasePos.push(ps); phaseCones.push(cs); phaseDirCones.push(ds);
+    }
+    function dirIndex(dx, dy) {
+      if (dx !== 0 && Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? 0 : 1;
+      if (dy !== 0) return dy > 0 ? 2 : 3;
+      return -1;
+    }
+    // Is (x,y) lit at phase t given the alert mask? (sx,sy) is the tile the
+    // alerted listeners are staring at — the player's position last turn.
+    function lit(x, y, t, mask, sx, sy) {
+      for (var i = 0; i < nG; i++) {
+        var cone;
+        if (listenerBit[i] >= 0 && (mask & (1 << listenerBit[i]))) {
+          var pg = phasePos[t][i];
+          var di = dirIndex(sx - pg.x, sy - pg.y);
+          cone = di < 0 ? phaseCones[t][i] : phaseDirCones[t][i][di];
+        } else {
+          cone = phaseCones[t][i];
+        }
+        for (var j = 0; j < cone.length; j++) {
+          if (cone[j].x === x && cone[j].y === y) return true;
         }
       }
       return false;
@@ -289,7 +362,7 @@
       var cur = queue[head++];
       if (cur.x === st.exit.x && cur.y === st.exit.y) {
         var path = [];
-        var k = cur.x + ',' + cur.y + ',' + cur.t;
+        var k = cur.x + ',' + cur.y + ',' + cur.t + ',' + cur.mask;
         while (seen[k]) {
           path.unshift(seen[k].action);
           k = seen[k].from;
@@ -301,17 +374,28 @@
         var nx = a.wait ? cur.x : cur.x + a.dx;
         var ny = a.wait ? cur.y : cur.y + a.dy;
         if (wall(nx, ny)) continue;
-        // Same order as takeTurn: player moves while guards are at phase
-        // cur.t (stepping into the beam = caught), then guards step to
-        // cur.t + 1 and the beam may sweep over the player.
-        if (lit(nx, ny, cur.t)) continue;
-        if (lit(nx, ny, (cur.t + 1) % cycle)) continue;
         var nt = (cur.t + 1) % cycle;
-        var key = nx + ',' + ny + ',' + nt;
+        // Same order as takeTurn: player moves while guards are at phase
+        // cur.t (with last turn's stare), steps them to cur.t + 1, then
+        // listeners that heard this move snap toward it before the second
+        // beam check.
+        if (lit(nx, ny, cur.t, cur.mask, cur.x, cur.y)) continue;
+        var mask2 = 0;
+        if (!a.wait) {
+          for (var li = 0; li < nG; li++) {
+            if (listenerBit[li] < 0) continue;
+            var pp = phasePos[nt][li];
+            if (Math.max(Math.abs(nx - pp.x), Math.abs(ny - pp.y)) <= hearing[li]) {
+              mask2 |= 1 << listenerBit[li];
+            }
+          }
+        }
+        if (lit(nx, ny, nt, mask2, nx, ny)) continue;
+        var key = nx + ',' + ny + ',' + nt + ',' + mask2;
         if (seen[key] !== undefined) continue;
         if (Object.keys(seen).length > maxStates) return null;
-        seen[key] = { from: cur.x + ',' + cur.y + ',' + cur.t, action: a };
-        queue.push({ x: nx, y: ny, t: nt });
+        seen[key] = { from: cur.x + ',' + cur.y + ',' + cur.t + ',' + cur.mask, action: a };
+        queue.push({ x: nx, y: ny, t: nt, mask: mask2 });
       }
     }
     return null;
@@ -326,7 +410,7 @@
       status: state.status,
       revealed: state.revealed,
       guards: state.guards.map(function (g) {
-        return { idx: g.idx, x: g.x, y: g.y, facing: g.facing };
+        return { idx: g.idx, x: g.x, y: g.y, facing: g.facing, alerted: g.alerted };
       })
     });
   }
@@ -342,6 +426,7 @@
       g.x = s.guards[i].x;
       g.y = s.guards[i].y;
       g.facing = s.guards[i].facing;
+      g.alerted = s.guards[i].alerted || false;
     });
     return state;
   }
@@ -353,6 +438,8 @@
     coneOf: coneOf,
     cones: cones,
     inCone: inCone,
+    hears: hears,
+    soundFacing: soundFacing,
     visibleNow: visibleNow,
     takeTurn: takeTurn,
     guardAt: guardAt,
