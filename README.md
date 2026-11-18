@@ -33,15 +33,22 @@ node --test
 The test suite includes a BFS solver that proves every shipped level is
 solvable and replays the found solution through the real game rules.
 
+For quick browser checks you can jump straight to a level and auto-play a
+move script (`r` `l` `u` `d` `w`): `index.html?level=5&moves=rdw`.
+
 ## How to play
 
 - `↑ ← ↓ →` or `WASD` — move one tile. Guards move one tile per your move.
-- `space` — wait a turn.
+- `space` — wait a turn. Waiting makes no sound.
 - `Z` — undo. `R` — restart the level.
 - Amber light is a guard's gaze. Stepping into it, or letting it sweep over
   you, means caught. Tiles it has lit stay in your memory, dimly, forever.
 - You can always feel the eight tiles around you (dim blue-grey).
-- Reach the green door. Four halls, escalating.
+- <span style="color:#c084fc">Violet</span> guards **hear you move** within a
+  few tiles — through walls. They snap to face the sound and stare for one
+  beat: if their gaze reaches you, you're caught; if a wall blocks it, you
+  just get lit. Stand still and they walk past.
+- Reach the green door. Six halls, escalating.
 
 ## The rules of the world
 
@@ -50,6 +57,9 @@ solvable and replays the found solution through the real game rules.
 - A guard sees a ±45° wedge, 4 tiles, blocked by walls.
 - You die if your tile is inside any wedge, checked when you move and when the
   guards move.
+- Violet guards also *hear* moves within a few tiles (waiting is silent, and
+  sound ignores walls). When heard, a listener turns to face the sound after
+  its step and holds that stare until its next step.
 - Everything a wedge has ever lit, you remember. Everything it never lit, you
   navigate by feel.
 
@@ -58,7 +68,7 @@ solvable and replays the found solution through the real game rules.
 ```
 index.html      open this to play
 src/logic.js    pure game rules (shared by browser and tests)
-src/levels.js   the four halls
+src/levels.js   the six halls
 src/main.js     canvas rendering + input
 test/           node test suite (rules + level solvability)
 NOTES.md        working notes for future sessions
