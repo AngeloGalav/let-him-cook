@@ -16,11 +16,13 @@ beat; solver models it with one alert bit per listener in the BFS state). Level 
 adds the inverted listener: hearing 4 = sight range, so a heard-but-unseen
 ring exists and the stare can be farmed as a flashlight (see geometry below).
 S8 added the ghost: your fastest escape per level is stored in localStorage
-and replays as a faint afterimage pacing you through the run.
+and replays as a faint afterimage pacing you through the run. S9 added
+heard-feedback: when a listener hears your move you get ripples + a ring +
+a low thud (see below).
 
 ## How to run / test
 ```
-node --test                 # 33 tests incl. level solvability + replay + ghost
+node --test                 # 36 tests incl. level solvability + replay + ghost
 open index.html             # play (no build step)
 python3 -m http.server -d . 8000   # fallback if file:// is blocked
 ```
@@ -98,12 +100,28 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   (strict: any garbage -> null), isBetterRun (ties keep incumbent),
   replay(level, movesStr) drives the real rules from 'rlduw' text. All
   storage access try/catch'd: no storage just means no ghost.
-- 33 tests: cone geometry (exact set + rotation symmetry), beam fan
+- Heard feedback (S9): logic.js `anyAlerted(state)` = any guard's `alerted`
+  flag (set by reactToSound, cleared on its next step) — true exactly on the
+  turn a listener heard your move. main.js: on such a turn (status playing)
+  act() spawns two staggered violet ripples at the player (t0, t0+130ms;
+  expand TILE*0.35->1.95 over 650ms, alpha .5->0) and plays a WebAudio thud
+  (sine 96->44Hz, 0.3s, gain .25, all try/catch). draw() also keeps a slow
+  pulsing violet ring on the player while anyAlerted — state-derived, so
+  undo restores it for free; this is the persistent tell for the
+  heard-but-unseen case (l10 lateral 1-3) where nothing else visibly moves.
+  Mute: `M` key or d-pad "sound" button, toast "sound on/off" fades top-right
+  of canvas; persisted as 'their-eyes-audio-v1' ('1' = muted). AudioContext
+  created lazily and only after a real gesture (userGestured flag in
+  keydown/touchstart/pointerdown) so autoplay policy is never fought and
+  headless ?moves= runs stay silent.
+- 36 tests: cone geometry (exact set + rotation symmetry), beam fan
   (coverage-of-clear-line + wall-stop + bounds), turn order, pause
   tells, memory, serialize, listener rules (6), moving-wall theorem control,
   every level solvable + replayed, classifySwipe (2), black-hall design
   properties (3), ghost (5: encode round-trip, strict decode, isBetterRun,
-  replay-of-solver-solution on all 10 levels, bump-free path steps).
+  replay-of-solver-solution on all 10 levels, bump-free path steps), heard
+  feedback (3: anyAlerted timing incl. wait-clears + out-of-earshot, watcher
+  never alerts, undo round-trip).
 - Renderer verified in headless Firefox for levels 1/4/5/7/9 (start states,
   alerted stare, caught overlay) and level 7 full-solution win overlay
   ("YOU ESCAPED · turn 19") — all with the S5 beam shafts. S6 re-verified
@@ -113,6 +131,10 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   solver replay win ("YOU ESCAPED · turn 20"). S8 verified the ghost on level 1: win run ("new best" + best 9
    stored), reload mid-run (ghost trail riding the player when replaying the
    same prefix; ghost visibly AHEAD when dawdling with waits — moves=wwrrr).
+   S9 verified heard-feedback on level 10 moves=r: stare flash down the
+   column + alert ring on guard + new violet ring on the player (heard but
+   unseen); level 10 start and level 1 are ring-free; touch 390px layout
+   fits the new sound button. Audio itself NOT verifiable headless.
 
 ## Geometry rules for listener levels (hard-won, S2+S4)
 - Beam from a guard reaches rows ±2 (dy=2: dx=±3 in wedge; dy=3 unreachable).
@@ -162,25 +184,24 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   threat to tool and is level 10's core.
 
 ## Next (ranked)
-1. Sound-detection feedback: subtle audio cue or screen-edge flash when a
-   listener hears you (currently the ring is the only tell). With level 10's
-   flash gimmick the "you were heard" moment deserves a stronger cue — the
-   reveal beat IS the feedback, but a silent lateral-4 move that produces no
-   flash is hard to read.
-2. Maybe: a second flash hall that forces the gimmick — e.g. the exit sits
+1. Maybe: a second flash hall that forces the gimmick — e.g. the exit sits
    where only a flash from a specific far corner reaches it, or two h4
    listeners where one's stare lights the other's blind spot.
-3. Maybe: a level whose whole gimmick is the dot=0 head-walk trick (level 9
+2. Maybe: a level whose whole gimmick is the dot=0 head-walk trick (level 9
    uses it in passing; level 10's row-3 notch ride exposes it; a dedicated
    watcher-only chase hall could make the notch the main road).
-4. Maybe: atmosphere pass — faint dust motes drifting through the beam
+3. Maybe: atmosphere pass — faint dust motes drifting through the beam
    shafts, or a slight per-tile warm tint on lit floor near the guard.
-5. Maybe: real-device touch pass — if a phone is ever available, check the
+4. Maybe: real-device touch pass — if a phone is ever available, check the
    24px swipe threshold and d-pad reach with a thumb; also consider
    long-press repeat on the d-pad.
-6. Maybe: ghost polish — a small "ahead/behind" cue (the ghost always draws
+5. Maybe: ghost polish — a small "ahead/behind" cue (the ghost always draws
    even when slower; could dim it when behind), or surface best times on a
    level-select screen (none exists yet).
+6. Maybe: audio expansion — the heard-thud is the game's only sound. A soft
+   heartbeat that fades in while a listener is within earshot (before you
+   move) would close the loop: it warns you *where* silence is required.
+   Only if it adds readability, not for ambience alone.
 
 ## Dead ends
 - Vertical guard patrols in rooms narrower than ~9 tiles: the ±45°/range-4
@@ -269,3 +290,11 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   replay helper also feeds tests: solver solutions now replay through it on
   all 10 levels). 5 tests -> 33. Headless-verified: win-to-store, reload,
   ghost ahead of a dawdling run.
+- S9 (2026-11-18): Heard feedback. The listener's "you made a noise" moment
+  now lands on the player: staggered violet ripples from the noisy tile, a
+  persistent pulsing ring while the stare is still turned at your last step
+  (state-derived via new anyAlerted, so undo restores it), and a low WebAudio
+  thud (M mutes, persisted; d-pad sound button for touch). AudioContext is
+  gesture-gated so autoplay policy and headless runs stay clean. 3 tests ->
+  36. Headless-verified on level 10's heard-but-unseen beat; level 1/10
+  starts ring-free; touch layout fits the new button.
