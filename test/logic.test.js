@@ -1122,3 +1122,30 @@ test('halls: totalBestTurns sums bests but refuses partial sets', () => {
   assert.strictEqual(G.totalBestTurns([]), null);
   assert.strictEqual(G.totalBestTurns([{ turns: 0 }]), 0);
 });
+
+// ---------- dust motes (decorative drift) ----------
+
+test('dust: motes stay in bounds and twinkle in range, at any time', () => {
+  for (const t of [0, 0.5, 3.7, 120, 10000]) {
+    for (const [w, h] of [[14, 13], [9, 9], [20, 15]]) {
+      const ms = G.dustMotes(t, w, h);
+      assert.ok(ms.length >= 10);
+      for (const m of ms) {
+        assert.ok(m.x >= 0 && m.x < w, 'x wraps into bounds');
+        assert.ok(m.y >= 0 && m.y < h, 'y wraps into bounds');
+        assert.ok(m.r > 0 && m.r < 3, 'radius is a dot');
+        assert.ok(m.a >= 0 && m.a <= 1, 'alpha in range');
+      }
+    }
+  }
+});
+
+test('dust: the field is deterministic and actually drifts', () => {
+  const a = G.dustMotes(5, 14, 13);
+  const b = G.dustMotes(5, 14, 13);
+  assert.deepStrictEqual(a, b, 'same time -> same field');
+  const c = G.dustMotes(5.5, 14, 13);
+  assert.notDeepStrictEqual(a, c, 'time moves the dust');
+  // the seed is fixed: the same hall always gets the same dust
+  assert.deepStrictEqual(a[0].x, G.dustMotes(5, 14, 13)[0].x);
+});

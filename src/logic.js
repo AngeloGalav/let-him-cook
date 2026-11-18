@@ -610,6 +610,41 @@
     return sum;
   }
 
+  // ---------- dust motes (decorative drift, pure) ----------
+  // Faint dust floating through the halls. Positions are a pure function of
+  // time — no state to desync, no respawn bookkeeping — seeded from a fixed
+  // constant so the same dust drifts through every hall and every run. The
+  // renderer draws a mote only while its tile is lit: the beam is the only
+  // thing that shows you the air. `t` is seconds; `w`/`h` are tile bounds.
+  function dustMotes(t, w, h) {
+    var n = Math.max(10, Math.round(w * h / 6));
+    var out = [];
+    var seed = 0x5d7f3a;
+    function rnd() { // mulberry32, seeded fresh each call: same field always
+      seed = seed + 0x6D2B79F5 | 0;
+      var z = seed;
+      z = Math.imul(z ^ z >>> 15, 1 | z);
+      z = z + Math.imul(z ^ z >>> 7, 61 | z) ^ z;
+      return ((z ^ z >>> 14) >>> 0) / 4294967296;
+    }
+    for (var i = 0; i < n; i++) {
+      var x0 = rnd() * w, y0 = rnd() * h;
+      var ang = rnd() * Math.PI * 2, sp = 0.04 + rnd() * 0.14; // tiles/sec
+      var ph = rnd() * Math.PI * 2;
+      var twf = 0.6 + rnd() * 1.2;
+      var x = x0 + Math.cos(ang) * sp * t + 0.12 * Math.sin(t * 0.35 + ph);
+      var y = y0 + Math.sin(ang) * sp * t + 0.10 * Math.sin(t * 0.27 + ph * 1.7);
+      var tw = 0.5 + 0.5 * Math.sin(t * twf + ph); // slow twinkle
+      out.push({
+        x: ((x % w) + w) % w,
+        y: ((y % h) + h) % h,
+        r: 0.7 + rnd() * 1.1,
+        a: 0.25 + 0.75 * tw
+      });
+    }
+    return out;
+  }
+
   var TheirEyes = {
     CONE_RADIUS: CONE_RADIUS,
     createGame: createGame,
@@ -637,7 +672,8 @@
     unlockedLevels: unlockedLevels,
     firstOpenLevel: firstOpenLevel,
     allCleared: allCleared,
-    totalBestTurns: totalBestTurns
+    totalBestTurns: totalBestTurns,
+    dustMotes: dustMotes
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = TheirEyes;

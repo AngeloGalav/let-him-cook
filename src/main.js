@@ -578,6 +578,24 @@
     }
     ctx.restore();
 
+    // dust motes: the beam is the only thing that shows you the air. The
+    // drift is pure (G.dustMotes, a function of time alone); a mote is drawn
+    // only while its tile is lit, so the dust swims into the shaft and out
+    // of existence — the same light that reveals the room reveals the dust,
+    // and both vanish the moment the guard looks away.
+    var motes = G.dustMotes(now / 1000, game.w, game.h);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (var di = 0; di < motes.length; di++) {
+      var mo = motes[di];
+      if (vis[Math.floor(mo.x) + ',' + Math.floor(mo.y)] !== 'light') continue;
+      ctx.fillStyle = 'rgba(255,228,170,' + (mo.a * 0.55).toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.arc(mo.x * TILE, mo.y * TILE, mo.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
     // guards: always visible — their own tile is inside their own gaze
     for (var gi = 0; gi < game.guards.length; gi++) {
       var g = game.guards[gi];
