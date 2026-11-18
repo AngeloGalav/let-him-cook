@@ -24,10 +24,14 @@ cleared); `L` peeks at it mid-run without losing state. S11 added hall 11
 "The Lighthouse": two h4 listeners on PERPENDICULAR streets (top row + left
 column) framing a dark hall no patrol beam reaches; each guard's lured stare
 is the only light for a region the other can never reach (see geometry).
+S12 added hall 12 "The Wake": two watchers, one per 5-row street of a U-shaped
+hall, each beam a full-width moving wall — the only road is a guard's dark
+wake; the escape chains two wake rides through a dark well with two flip
+gates (see geometry).
 
 ## How to run / test
 ```
-node --test                 # 42 tests incl. level solvability + replay + ghost
+node --test                 # 47 tests incl. level solvability + replay + ghost
 open index.html             # play (no build step)
 python3 -m http.server -d . 8000   # fallback if file:// is blocked
 ```
@@ -52,7 +56,7 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
 - Works: cones (±45°, range 4, wall-blocked), guard routes with pause-tiles
   that telegraph the next step, turn resolution (move → cone-check → guards
   step → sound-turn → cone-check → win-check), listener hearing + stare,
-  reveal memory, undo, 10 solvable levels, canvas renderer with smooth
+  reveal memory, undo, 12 solvable levels, canvas renderer with smooth
   raycast beam shafts (S5), violet listeners with sound-ring when alerted,
   caught/won/done overlays.
 - Mobile (S6): canvas scales to viewport width (backing store = display px ×
@@ -152,7 +156,20 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   wwwrrrrrrdddrdwrrr + 12xw + r. Halls screen: HALLS_H is gone; hallsH()
   derives the logical height from ceil(n/2) card rows so the grid grows
   with the level count (11 cards = 6 rows, footer clear).
-- 42 tests: cone geometry (exact set + rotation symmetry), beam fan
+- Wake hall (S12): level 12, U-shaped hall (14x13): upper street rows 1-5
+  (watcher A, row 3, ping 2..12), lower street rows 7-11 (watcher B, row 9,
+  ping 12..2 — phase-staggered so each starts just past its east/west flip),
+  wall row 6 with a 2-wide well at cols 1-2 joining them. Both watchers (a
+  listener would hear the rider). The escape (solver: 35 turns, moves
+  rllllllllllrrlluuuuuurrrrrrrrrruwuu): ride B's wake west along row 11, get
+  shuffled by B's return sweep, climb the well timed to A's west flip, ride
+  A east in the dot=0 notch under its chin, survive the east flip at (12,4),
+  wait a beat, step (12,3)->(12,2)=exit. Design tests (5): wall-to-wall
+  sweep at dx=2,3 every phase; rear half-plane dark every phase; exit is a
+  flip gate (lit at t8/t9 approach, dark at t10/t11 after the turn, rider
+  tile (12,4) dark after); well tiles (1,6),(2,6) never lit; solve length
+  >= 30 pins "no shortcut".
+- 47 tests: cone geometry (exact set + rotation symmetry), beam fan
   (coverage-of-clear-line + wall-stop + bounds), turn order, pause
   tells, memory, serialize, listener rules (6), moving-wall theorem control,
   every level solvable + replayed, classifySwipe (2), black-hall design
@@ -162,7 +179,9 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   never alerts, undo round-trip), halls ladder (2: unlockedLevels rung-by-
   rung + short-array padding, firstOpenLevel incl. all-cleared -> 0),
   lighthouse design (4: hall dark in all phases, exit lit only by the col-13
-  stare, row-5 trigger ring, (5,5) lit only by the other guard).
+  stare, row-5 trigger ring, (5,5) lit only by the other guard), wake hall
+  design (5: wall-to-wall sweep, dark wake, flip-gate exit, never-lit well
+  core, ride length >= 30).
 - Renderer verified in headless Firefox for levels 1/4/5/7/9 (start states,
   alerted stare, caught overlay) and level 7 full-solution win overlay
   ("YOU ESCAPED · turn 19") — all with the S5 beam shafts. S6 re-verified
@@ -187,7 +206,12 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
    (moves=wwwrrrrrrdddrdwrrr+12w+r: south stare down column 13, exit arch
    lit beside the player, alert ring on player), solver-replay win ("YOU
    ESCAPED · turn 20 · new best"), and the 11-card halls grid fitting the
-   grown canvas (6 rows, footer clear).
+   grown canvas (6 rows, footer clear). S12 verified level 12 headless:
+   start (two lit streets, player in the lower wake, exit unseen), mid-ride
+   (moves=rllllllll: player in the dark wake behind the lower beam, exit
+   arch revealed by the upper beam's memory), solver-replay win ("YOU
+   ESCAPED · turn 35 · new best"), and the 12-card halls grid (6 rows,
+   footer clear, locked card shows no name).
 
 ## Geometry rules for listener levels (hard-won, S2+S4)
 - Beam from a guard reaches rows ±2 (dy=2: dx=±3 in wedge; dy=3 unreachable).
@@ -247,28 +271,49 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   axis tie goes horizontal, so the guard stares SIDEWAYS, not down — only
   laterals with |dx| < dy (1..3 at dy=4) produce the column flash. A
   lateral-4 bait is heard-and-safe but lights the street, not the hall.
+- Full-width moving wall (S12): a ±45°/range-4 beam fills a 5-row street
+  wall to wall at forward columns dx=2 AND 3 (dy=±2 lit: 2·dx² ≥ dx²+4 for
+  dx≥2; dx=1 leaves the wall rows dark, dx=4 is past the disc). A street
+  can never be crossed in front of its guard, and the wall is 2 columns
+  wide so there is no sliver to slip through. This is what makes the wake
+  the only road.
+- The wake road (S12): rear half-plane dark (dot<0) + the dot=0 column
+  beside the guard + the two sliver tiles at (−1,±2) ahead in the wall rows
+  — that is the complete dark set adjacent to a patrolling watcher. The
+  forward diagonals (−k,±1) are lit for every k=1..4 (2k² ≥ k²+1), so a
+  chasing beam always lights a well/door mouth ahead of it: you can never
+  turn into safety while being chased, only after the chaser flips.
+- Flip gate (S12): the dot=0 column beside a guard at its patrol end is the
+  only survival tile in FRONT of the beam; an exit placed there is lethal
+  all through the approach and opens for the beats the guard sits turned.
+  The rider dives the beat AFTER the flip (the guard's own tile blocks the
+  tile before that). Level 12's exit and its opening pocket are both built
+  on this.
+- Sweep phase is a design tool (S12): a guard's route can START anywhere in
+  its cycle (ping(12,9,2,9) starts at the east end mid-flip), so you can
+  phase-lock guards to each other and to the player's start. Level 12 starts
+  each street's guard just past its flip so the player begins IN the wake —
+  the player never survives a sweep's arrival, they only inherit a shadow.
 
 ## Next (ranked)
-1. Maybe: a wake-ride hall — make the wake the main verb: a guard walks a
-   long circuit and the only safe road is its wake; the player must ride
-   several turns and dismount at the right corner (the wake flips sides at
-   every turn — every corner is a deadline). Level 11 uses the ride as its
-   opening; a dedicated hall could make it the whole puzzle.
-2. Maybe: a chain-flash hall — the only tile from which guard A can be rung
+1. Maybe: a chain-flash hall — the only tile from which guard A can be rung
    sits inside guard B's patrol beam, so the bell must be rung from a moving
    pocket: two bells timed against each other.
-3. Maybe: atmosphere pass — faint dust motes drifting through the beam
+2. Maybe: atmosphere pass — faint dust motes drifting through the beam
    shafts, or a slight per-tile warm tint on lit floor near the guard.
-4. Maybe: audio expansion — the heard-thud is the game's only sound. A soft
+3. Maybe: audio expansion — the heard-thud is the game's only sound. A soft
    heartbeat that fades in while a listener is within earshot (before you
    move) would close the loop: it warns you *where* silence is required.
    Only if it adds readability, not for ambience alone.
-5. Maybe: ghost polish — a small "ahead/behind" cue (the ghost always draws
+4. Maybe: ghost polish — a small "ahead/behind" cue (the ghost always draws
    even when slower; could dim it when behind). The level-select half of this
    landed in S10 (halls screen shows best times).
-6. Maybe: real-device touch pass — if a phone is ever available, check the
+5. Maybe: real-device touch pass — if a phone is ever available, check the
    24px swipe threshold and d-pad reach with a thumb; also consider
    long-press repeat on the d-pad.
+6. Maybe: decide whether the game is DONE — twelve halls, every mechanic
+   represented, hub + ghost + mobile + audio all verified. If a next session
+   has no burning idea, polish README, write the final devlog, set DONE.
 
 ## Dead ends
 - Vertical guard patrols in rooms narrower than ~9 tiles: the ±45°/range-4
@@ -302,6 +347,17 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   usable version of the idea is the WAKE (see geometry rules) — that's
   level 11's opening. The notch itself stays a hiding spot and crossing
   gate (level 9's head-walk), not a highway.
+- One guard patrolling a U of two corridors cannot force a wake ride (S12
+  v1): each corridor is dark during the other's leg, and the dark window
+  (opposite leg + junction) always fits the crossing — the solver just
+  strolled through darkness. Forced riding needs EVERY traversable street
+  swept at all times: one dedicated guard per street.
+- Two guards sweeping both streets, naive phase (S12 v2): UNSOLVABLE. The
+  player must survive a full-width sweep arriving at a dead end; the wall
+  (dx=2,3) sweeps the east pocket two beats before the guard arrives, and
+  the well mouth is lit by the chaser's forward diagonals the whole chase
+  (see geometry). Frontier died at turn 6. Fixed by PHASE, not geometry:
+  start guards past their flips so the player begins in the wake.
 - S2's note "diagonal k=3 is in the cone" was WRONG (see S3 note in git
   history): range check excluded (3,3)/(4,4); the S3 fix only added the
   45° tiles at distance 1-2.
@@ -397,3 +453,17 @@ Solver-path → moves-string one-liner lives in the S4 commit workflow:
   halls screen had a fixed 500px height that the 11th card overflowed;
   hallsH() now derives it from the level count. Headless-verified start,
   flash moment, win, and the grown halls grid.
+- S12 (2026-11-18): Hall 12 "The Wake" — the wake-ride hall, built from the
+  wake geometry S11 discovered. A ±45°/range-4 beam fills a 5-row street
+  wall-to-wall at forward dx=2,3 (proved by test), so with one watcher per
+  street the streets are impassable moving walls and the only road is each
+  guard's dark wake. Two design failures first: one guard on a U was not
+  forced (solver crossed in the dark — dark window always fits the crossing);
+  two guards with naive phase was UNSOLVABLE (the arriving sweep sweeps the
+  east pocket before the guard does, and the chase's forward diagonals light
+  the well mouth — frontier died at t6). Fixed by route PHASE: guards start
+  past their flips, the player begins in the wake and never survives a
+  sweep, only inherits a shadow. Escape = ride lower wake west, climb the
+  never-lit well timed to the upper flip, ride the upper notch east, dive
+  the exit the beat after the turn (flip-gate geometry). Solver: 35 turns;
+  5 design tests -> 47. Headless-verified start/mid-ride/win/12-card halls.
