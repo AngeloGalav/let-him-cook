@@ -50,6 +50,9 @@ you've unlocked — your current run waits for you.
 - `Z` — undo. `R` — restart the level. `M` — sound on/off. `L` — the halls.
 - Amber light is a guard's gaze. Stepping into it, or letting it sweep over
   you, means caught. Tiles it has lit stay in your memory, dimly, forever.
+- The only other thing the light shows you is **dust**: faint motes drift
+  through every hall, visible only inside a beam. The air is there; their
+  gaze decides whether you see it.
 - You can always feel the eight tiles around you (dim blue-grey).
 - <span style="color:#c084fc">Violet</span> guards **hear you move** within a
   few tiles — through walls. They snap to face the sound and stare for one
