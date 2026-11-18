@@ -1103,3 +1103,22 @@ test('halls: firstOpenLevel points at the next uncleared unlocked level', () => 
   // all cleared: back to 0, every door is open by then anyway
   assert.strictEqual(G.firstOpenLevel([true, true, true], 3), 0);
 });
+
+test('halls: allCleared flips only when every hall has a best', () => {
+  assert.strictEqual(G.allCleared([true, true, true], 3), true);
+  assert.strictEqual(G.allCleared([true, true, false], 3), false);
+  assert.strictEqual(G.allCleared([true, false, true], 3), false);
+  // a short cleared array reads as "not cleared" for the missing entries
+  assert.strictEqual(G.allCleared([true, true], 3), false);
+  // nothing to clear is not an epilogue
+  assert.strictEqual(G.allCleared([], 0), false);
+});
+
+test('halls: totalBestTurns sums bests but refuses partial sets', () => {
+  assert.strictEqual(G.totalBestTurns([{ turns: 9 }, { turns: 12 }, { turns: 20 }]), 41);
+  // a missing best would silently undercount, so the line refuses to render
+  assert.strictEqual(G.totalBestTurns([{ turns: 9 }, null, { turns: 20 }]), null);
+  assert.strictEqual(G.totalBestTurns([{ turns: 9 }, {}, { turns: 20 }]), null);
+  assert.strictEqual(G.totalBestTurns([]), null);
+  assert.strictEqual(G.totalBestTurns([{ turns: 0 }]), 0);
+});

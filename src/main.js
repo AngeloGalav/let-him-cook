@@ -34,7 +34,10 @@
   var HALL_TOP = 64, HALL_MX = 20, HALL_GAP = 14, HALL_VGAP = 12, HALL_CH = 72;
   function hallsH() {
     var rows = Math.ceil(LEVELS.length / 2);
-    return HALL_TOP + rows * (HALL_CH + HALL_VGAP) - HALL_VGAP + 28;
+    var h = HALL_TOP + rows * (HALL_CH + HALL_VGAP) - HALL_VGAP + 28;
+    // the epilogue line gets its own line of margin above the footer
+    if (G.allCleared(clearedFlags(), LEVELS.length)) h += 26;
+    return h;
   }
 
   // ---------- sound: the "you were heard" thud ----------
@@ -157,6 +160,12 @@
   function clearedFlags() {
     var out = [];
     for (var i = 0; i < LEVELS.length; i++) out.push(!!bestAt(i));
+    return out;
+  }
+
+  function allBests() {
+    var out = [];
+    for (var i = 0; i < LEVELS.length; i++) out.push(bestAt(i));
     return out;
   }
 
@@ -437,8 +446,18 @@
 
   // The halls screen: a grid of cards, one per level. Cleared halls show
   // their best time (the ghost's record); locked ones show only a number.
+  // Once EVERY hall is cleared the hub itself changes — a warm wash, amber
+  // cards, and the total turn count: the dark you moved through is gone.
   function drawHalls(now) {
+    var lit = G.allCleared(clearedFlags(), LEVELS.length);
     ctx.clearRect(0, 0, HALLS_W, hallsH());
+    if (lit) {
+      var wash = ctx.createLinearGradient(0, 0, 0, hallsH());
+      wash.addColorStop(0, 'rgba(255,176,64,0.07)');
+      wash.addColorStop(1, 'rgba(255,176,64,0.015)');
+      ctx.fillStyle = wash;
+      ctx.fillRect(0, 0, HALLS_W, hallsH());
+    }
     ctx.textAlign = 'center';
     ctx.fillStyle = '#c9d2e4';
     ctx.font = '22px ui-monospace, monospace';
@@ -449,13 +468,14 @@
       var cur = (k === selCursor);
       roundRect(c.x, c.y, c.w, c.h, 10);
       ctx.fillStyle = c.unlocked ? (cur ? '#151a28' : '#0e1119') : '#0a0c12';
+      if (lit) ctx.fillStyle = cur ? '#1c1508' : '#150f06';
       ctx.fill();
       if (cur) {
         ctx.lineWidth = 2;
         ctx.strokeStyle = 'rgba(143,216,255,' + (0.6 + 0.3 * Math.sin(now / 300)).toFixed(3) + ')';
       } else {
         ctx.lineWidth = 1;
-        ctx.strokeStyle = c.unlocked ? '#262c40' : '#161a26';
+        ctx.strokeStyle = lit ? 'rgba(255,176,64,0.45)' : (c.unlocked ? '#262c40' : '#161a26');
       }
       ctx.stroke();
       ctx.textAlign = 'left';
@@ -480,6 +500,12 @@
       }
     }
     ctx.textAlign = 'center';
+    if (lit) {
+      var total = G.totalBestTurns(allBests());
+      ctx.font = '13px ui-monospace, monospace';
+      ctx.fillStyle = '#ffb040';
+      ctx.fillText('every hall lit · ' + total + ' turns in all', HALLS_W / 2, hallsH() - 40);
+    }
     ctx.font = '12px ui-monospace, monospace';
     ctx.fillStyle = '#566080';
     var line;
@@ -662,7 +688,10 @@
         ctx.fillText('YOU HAVE THEIR EYES', w / 2, h / 2 - 14);
         ctx.font = '13px ui-monospace, monospace';
         ctx.fillStyle = '#5a627a';
-        ctx.fillText('every hall cleared · ' + (touchMode ? 'tap' : 'L') + ' back to the halls', w / 2, h / 2 + 16);
+        var tot = G.totalBestTurns(allBests());
+        ctx.fillText('every hall cleared' + (tot === null ? '' : ' · ' + tot + ' turns in all'),
+                     w / 2, h / 2 + 16);
+        ctx.fillText((touchMode ? 'tap' : 'L') + ' back to the halls', w / 2, h / 2 + 34);
       } else if (game.status === 'caught') {
         ctx.fillStyle = '#ff6b6b';
         ctx.font = '28px ui-monospace, monospace';

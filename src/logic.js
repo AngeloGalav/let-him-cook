@@ -585,6 +585,31 @@
     return 0;
   }
 
+  // The epilogue switch: true once every hall has a best run. The hub lights
+  // up when this flips — the game's last reward is the dark itself leaving.
+  // A short `cleared` array reads as "not cleared" for the missing entries,
+  // and count 0 is deliberately NOT "all cleared": nothing was ever lit.
+  function allCleared(cleared, count) {
+    if (count <= 0) return false;
+    for (var i = 0; i < count; i++) {
+      if (!cleared[i]) return false;
+    }
+    return true;
+  }
+
+  // Sum of the best times, but only when EVERY hall has one: the epilogue's
+  // "N turns in all" line must never quietly undercount a partial run.
+  // `bests` is one entry per level: { turns, ... } or null.
+  function totalBestTurns(bests) {
+    if (!bests || !bests.length) return null;
+    var sum = 0;
+    for (var i = 0; i < bests.length; i++) {
+      if (!bests[i] || typeof bests[i].turns !== 'number') return null;
+      sum += bests[i].turns;
+    }
+    return sum;
+  }
+
   var TheirEyes = {
     CONE_RADIUS: CONE_RADIUS,
     createGame: createGame,
@@ -610,7 +635,9 @@
     isBetterRun: isBetterRun,
     replay: replay,
     unlockedLevels: unlockedLevels,
-    firstOpenLevel: firstOpenLevel
+    firstOpenLevel: firstOpenLevel,
+    allCleared: allCleared,
+    totalBestTurns: totalBestTurns
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = TheirEyes;
