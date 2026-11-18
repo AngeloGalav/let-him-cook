@@ -23,6 +23,53 @@
   var runPath = [];   // player positions this run, one per turn, path[0] = start
   var best = null;    // { turns, path } best run for this level, or null
   var newBest = false;
+  var ripples = [];   // decorative sound rings: { x, y, t0 } (performance.now)
+  var userGestured = false; // browsers only allow audio after a real gesture
+
+  // ---------- sound: the "you were heard" thud ----------
+  // A short low sine thump, synthesized on the fly (no assets). The context is
+  // created lazily and only after a real user gesture, so autoplay policy is
+  // never violated and headless runs stay silent. Mute state persists; every
+  // storage/audio access is wrapped so a locked-down browser just gets the
+  // visual cues instead.
+
+  function loadMuted() {
+    try { return window.localStorage.getItem('their-eyes-audio-v1') === '1'; }
+    catch (e) { return false; }
+  }
+  var muted = loadMuted();
+  var audioCtx = null;
+  var toastText = '', toastUntil = 0;
+
+  function thud() {
+    if (muted || !userGestured) return;
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!audioCtx) audioCtx = new AC();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      var t = audioCtx.currentTime;
+      var o = audioCtx.createOscillator(), gn = audioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(96, t);
+      o.frequency.exponentialRampToValueAtTime(44, t + 0.16);
+      gn.gain.setValueAtTime(0.0001, t);
+      gn.gain.exponentialRampToValueAtTime(0.25, t + 0.012);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      o.connect(gn);
+      gn.connect(audioCtx.destination);
+      o.start(t);
+      o.stop(t + 0.32);
+    } catch (e) { /* no audio: the visual cue still plays */ }
+  }
+
+  function toggleMute() {
+    muted = !muted;
+    try { window.localStorage.setItem('their-eyes-audio-v1', muted ? '1' : '0'); }
+    catch (e) { /* mute state just won't persist */ }
+    toastText = muted ? 'sound off' : 'sound on';
+    toastUntil = performance.now() + 1400;
+  }
 
   // ---------- best-run storage (the ghost) ----------
   // localStorage can be missing or throw (private mode, blocked file://), so
@@ -54,6 +101,7 @@
     game = G.createGame(LEVELS[i]);
     undoStack = [];
     runPath = [{ x: game.player.x, y: game.player.y }];
+    ripples = [];
     best = loadBest(i);
     newBest = false;
     fitCanvas();
@@ -85,6 +133,15 @@
     if (!consumed) { undoStack.pop(); return; } // wall bumps are free, not undoable
     runPath.push({ x: game.player.x, y: game.player.y });
     if (undoStack.length > 500) undoStack.shift();
+    // heard feedback: two staggered violet ripples leave the tile that made
+    // the noise, plus a low thud. The persistent tell (a ring that stays until
+    // your next action) is drawn from game state in draw().
+    if (game.status === 'playing' && G.anyAlerted(game)) {
+      var t0 = performance.now();
+      ripples.push({ x: game.player.x, y: game.player.y, t0: t0 });
+      ripples.push({ x: game.player.x, y: game.player.y, t0: t0 + 130 });
+      thud();
+    }
     if (game.status === 'won') {
       var run = { turns: game.turn, path: runPath.slice() };
       if (G.isBetterRun(run, best)) {
@@ -111,6 +168,7 @@
   }
 
   document.addEventListener('keydown', function (e) {
+    userGestured = true;
     var k = e.key;
     var dirs = {
       ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
@@ -128,6 +186,8 @@
       undo();
     } else if (k === 'r' || k === 'R') {
       loadLevel(levelIdx);
+    } else if (k === 'm' || k === 'M') {
+      toggleMute();
     } else if (k === 'Enter') {
       nextLevel();
     }
@@ -139,6 +199,7 @@
   // game is fully playable without a keyboard.
   var touchStart = null;
   canvas.addEventListener('touchstart', function (e) {
+    userGestured = true;
     if (e.touches.length === 1) {
       touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     }
@@ -167,8 +228,10 @@
       var name = btn.getAttribute('data-act');
       btn.addEventListener('pointerdown', function (e) {
         e.preventDefault();
+        userGestured = true;
         if (name === 'undo') undo();
         else if (name === 'restart') loadLevel(levelIdx);
+        else if (name === 'sound') toggleMute();
         else act(TOUCH_ACTIONS[name]);
       });
     })(pads[p]);
@@ -301,6 +364,36 @@
     ctx.fill();
     ctx.restore();
 
+    // heard feedback, persistent half: while a listener is still staring at
+    // your last footstep, a slow violet ring stays on you. It reads as "that
+    // step made noise" even when the stare itself lands somewhere you cannot
+    // see (level 10's heard-but-unseen ring). Derived from game state, so
+    // undo restores it for free.
+    if (game.status === 'playing' && G.anyAlerted(game)) {
+      var pr = 11 + 1.6 * Math.sin(now / 240);
+      ctx.strokeStyle = 'rgba(192,132,252,0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(pcx, pcy, pr, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // heard feedback, decorative half: two staggered rings expand from the
+    // tile that made the noise and fade out (spawned in act()).
+    var nowMs = performance.now();
+    for (var ri = ripples.length - 1; ri >= 0; ri--) {
+      var rp = ripples[ri];
+      var age = (nowMs - rp.t0) / 650;
+      if (age < 0) continue; // staggered second ring, not born yet
+      if (age >= 1) { ripples.splice(ri, 1); continue; }
+      ctx.strokeStyle = 'rgba(192,132,252,' + (0.5 * (1 - age)).toFixed(3) + ')';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(rp.x * TILE + TILE / 2, rp.y * TILE + TILE / 2,
+              TILE * (0.35 + 1.6 * age), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
     // status overlays
     if (game.status === 'caught' || game.status === 'won' || allDone) {
       ctx.fillStyle = 'rgba(7,8,13,0.72)';
@@ -330,6 +423,16 @@
         var next = levelIdx + 1 < LEVELS.length ? key + ': next hall' : key + ': finish';
         ctx.fillText('turn ' + game.turn + (newBest ? ' · new best' : '') + ' · ' + next, w / 2, h / 2 + 16);
       }
+    }
+
+    // mute toast: small fading label, drawn last so it sits above overlays
+    if (nowMs < toastUntil) {
+      ctx.globalAlpha = Math.min(1, (toastUntil - nowMs) / 400);
+      ctx.fillStyle = '#5a627a';
+      ctx.font = '11px ui-monospace, monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(toastText, w - 8, 16);
+      ctx.globalAlpha = 1;
     }
 
     turnsEl.textContent = 'turn ' + game.turn + (best ? ' · best ' + best.turns : '');

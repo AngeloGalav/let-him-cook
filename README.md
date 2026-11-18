@@ -40,7 +40,7 @@ move script (`r` `l` `u` `d` `w`): `index.html?level=5&moves=rdw`.
 
 - `↑ ← ↓ →` or `WASD` — move one tile. Guards move one tile per your move.
 - `space` — wait a turn. Waiting makes no sound.
-- `Z` — undo. `R` — restart the level.
+- `Z` — undo. `R` — restart the level. `M` — sound on/off.
 - Amber light is a guard's gaze. Stepping into it, or letting it sweep over
   you, means caught. Tiles it has lit stay in your memory, dimly, forever.
 - You can always feel the eight tiles around you (dim blue-grey).
@@ -48,6 +48,10 @@ move script (`r` `l` `u` `d` `w`): `index.html?level=5&moves=rdw`.
   few tiles — through walls. They snap to face the sound and stare for one
   beat: if their gaze reaches you, you're caught; if a wall blocks it, you
   just get lit. Stand still and they walk past.
+- When a listener hears your step, you **know** it: a violet ripple expands
+  from the tile that made the noise, a low thud sounds (`M` mutes), and a
+  faint violet ring stays on you until your next action — even when the
+  stare itself lands where you can't see it.
 - Pillars block sight but **not** sound. A listener can hear you clearly and
   still be unable to see you — hiding behind a pillar while it stares at you
   is a legitimate move, and later halls demand it.

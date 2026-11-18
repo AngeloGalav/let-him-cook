@@ -256,6 +256,18 @@
     }
   }
 
+  // Renderer cue helper: true right after a turn in which at least one
+  // listener heard the player's move. The alert flag is set by reactToSound
+  // and cleared on the listener's next step, so this means "you were heard
+  // THIS turn" — exactly when the renderer should show the heard-feedback
+  // ripple and keep the ring on the player until their next action.
+  function anyAlerted(state) {
+    for (var i = 0; i < state.guards.length; i++) {
+      if (state.guards[i].alerted) return true;
+    }
+    return false;
+  }
+
   // ---------- turn resolution ----------
 
   // action: {dx, dy}, or {wait: true} to pass.
@@ -539,6 +551,7 @@
     inCone: inCone,
     hears: hears,
     soundFacing: soundFacing,
+    anyAlerted: anyAlerted,
     visibleNow: visibleNow,
     takeTurn: takeTurn,
     guardAt: guardAt,

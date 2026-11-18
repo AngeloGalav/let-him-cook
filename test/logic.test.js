@@ -657,3 +657,60 @@ test('ghost: replay path steps are waits or single steps; free bumps add none', 
     assert.ok(d <= 1, 'step ' + i + ' must not jump');
   }
 });
+
+// ---------- heard feedback (anyAlerted) ----------
+
+// Room split by a wall column at x=3 (rows 1..5). A listener at (5,3) with
+// hearing 3 hears the player at (2,3) through the wall, but its west stare
+// is blocked by it — the exact "heard but not seen" case the ripple is for.
+function heardLevel(type) {
+  return testLevel({
+    grid: [
+      '###########',
+      '#P.#......#',
+      '#..#......#',
+      '#..#..E...#',
+      '#..#......#',
+      '#..#......#',
+      '###########'
+    ],
+    guards: [{ route: [[5, 3]], type: type, hearing: 3 }]
+  });
+}
+
+test('heard: anyAlerted is true exactly on the turn a listener hears the move', () => {
+  const st = G.createGame(heardLevel('listener'));
+  assert.strictEqual(G.anyAlerted(st), false, 'start: nobody heard anything');
+  G.takeTurn(st, { dx: 0, dy: 1 }); // (1,2): Chebyshev 4 from (5,3) -> silent
+  assert.strictEqual(G.anyAlerted(st), false, 'out of earshot');
+  G.takeTurn(st, { dx: 0, dy: 1 }); // (1,3): still 4 -> silent
+  assert.strictEqual(G.anyAlerted(st), false, 'still out of earshot');
+  G.takeTurn(st, { dx: 1, dy: 0 }); // (2,3): distance 3 -> heard, stare blocked
+  assert.strictEqual(st.status, 'playing', 'the wall blocks the stare');
+  assert.strictEqual(G.anyAlerted(st), true, 'heard this turn');
+  G.takeTurn(st, { wait: true }); // waiting is silent and clears the stare
+  assert.strictEqual(G.anyAlerted(st), false, 'cleared on the next turn');
+  G.takeTurn(st, { dx: -1, dy: 0 }); // (1,3): back out of earshot
+  assert.strictEqual(G.anyAlerted(st), false, 'unheard again');
+});
+
+test('heard: a watcher never alerts', () => {
+  const st = G.createGame(heardLevel('watcher'));
+  G.takeTurn(st, { dx: 0, dy: 1 });
+  G.takeTurn(st, { dx: 0, dy: 1 });
+  G.takeTurn(st, { dx: 1, dy: 0 }); // right next to the wall, 3 from the watcher
+  assert.strictEqual(G.anyAlerted(st), false);
+});
+
+test('heard: anyAlerted survives the undo round-trip', () => {
+  const st = G.createGame(heardLevel('listener'));
+  G.takeTurn(st, { dx: 0, dy: 1 });
+  G.takeTurn(st, { dx: 0, dy: 1 });
+  G.takeTurn(st, { dx: 1, dy: 0 });
+  const snap = G.serialize(st);
+  assert.strictEqual(G.anyAlerted(st), true);
+  G.takeTurn(st, { wait: true });
+  assert.strictEqual(G.anyAlerted(st), false, 'wait clears it');
+  G.restore(st, snap);
+  assert.strictEqual(G.anyAlerted(st), true, 'undo restores the heard state');
+});
