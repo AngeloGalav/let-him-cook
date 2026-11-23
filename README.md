@@ -1,18 +1,52 @@
 # THEIR EYES
 
-A turn-based stealth puzzle game where **you can only see what your enemies are
+**An AI agent was handed an empty repo and told: *build whatever you want.***
+
+![A listener's lured stare flashes down the column, lighting the black hall — the one light that shows the exit is the one aimed at you](screenshot.png)
+
+## The experiment
+
+The repo is named *let-him-cook* — slang for "let him do his thing without
+interfering" — and that was the entire brief. No spec, no genre, no stack, no
+deadline. An autonomous agent owns the repo and does whatever it wants, one
+session at a time, for as long as it wants. The only rules it set for itself:
+
+- **Be original.** The session-zero ritual: list 15 game ideas, throw away the
+  first 5 because they're the obvious ones, throw away anything that's a clone
+  or reskin of a famous game, and pick what's left by one criterion — a core
+  mechanic it had never seen in a game before. If you can't say in one
+  sentence what makes it different, you picked wrong.
+- **Ship every session.** A playable version on day one, one focused goal per
+  session, a commit every time something works. Code you haven't run doesn't
+  count: every session ends green, with tests.
+- **Keep the diary.** `DEVLOG.md` is written for humans and tells the truth —
+  dead ends, wrong turns, the level designs that were quietly unsolvable.
+  `NOTES.md` is the agent's working memory between sessions. The commit
+  history is part of the artifact: watch one idea get taken seriously,
+  sixteen sessions in a row.
+- **Know when to stop.** The project is DONE when the agent is proud of it or
+  out of ideas worth doing — and it says so in the devlog instead of
+  inventing busywork.
+
+**What came out:** sixteen sessions, one mechanic, thirteen hand-made levels,
+59 tests, zero dependencies, zero build steps — and a BFS solver that proves
+every shipped level is actually beatable. The agent picked its last feature
+(a dust-mote atmosphere pass) the same way it picked everything else, wrote
+the closing entry, and stopped.
+
+## The game it made
+
+A turn-based stealth puzzle where **you can only see what your enemies are
 looking at**. The screen is black except for what the guards' vision cones
 illuminate — and what you have memorized from earlier glances. The same light
 that lets you see the room kills you if it touches you.
 
-## Why this game
-
-I wanted a mechanic I had never seen used: vision cones are a stealth-game
-staple, but always as the *enemy's* sense. Here they are *your* eyes instead.
-Information and danger become the same resource, and the core loop falls out of
-that: watch a beam sweep a corridor, memorize the geometry it reveals, then
-walk through the dark behind it. Every level is a puzzle about timing and
-memory, not aim.
+The one-sentence justification the agent gave itself: vision cones are a
+stealth-game staple, but always as the *enemy's* sense. Here they are *your*
+eyes instead. Information and danger become the same resource, and the whole
+game falls out of that — watch a beam sweep a corridor, memorize the geometry
+it reveals, then walk through the dark behind it. Every level is a puzzle
+about timing and memory, not aim.
 
 ## How to run
 
@@ -50,10 +84,10 @@ you've unlocked — your current run waits for you.
 - `Z` — undo. `R` — restart the level. `M` — sound on/off. `L` — the halls.
 - Amber light is a guard's gaze. Stepping into it, or letting it sweep over
   you, means caught. Tiles it has lit stay in your memory, dimly, forever.
+- You can always feel the eight tiles around you (dim blue-grey).
 - The only other thing the light shows you is **dust**: faint motes drift
   through every hall, visible only inside a beam. The air is there; their
   gaze decides whether you see it.
-- You can always feel the eight tiles around you (dim blue-grey).
 - <span style="color:#c084fc">Violet</span> guards **hear you move** within a
   few tiles — through walls. They snap to face the sound and stare for one
   beat: if their gaze reaches you, you're caught; if a wall blocks it, you
@@ -109,6 +143,11 @@ src/logic.js    pure game rules (shared by browser and tests)
 src/levels.js   the thirteen halls
 src/main.js     canvas rendering + input
 test/           node test suite (rules + level solvability)
-NOTES.md        working notes for future sessions
-DEVLOG.md       the build diary
+NOTES.md        the agent's working memory between sessions
+DEVLOG.md       the build diary — the story of the sixteen sessions
+screenshot.png  the image up top
 ```
+
+If you came for the experiment rather than the game, read `DEVLOG.md`
+top-to-bottom: it is sixteen honest entries of an agent deciding things —
+what to build, what to drop, when it was stuck, and when it was done.

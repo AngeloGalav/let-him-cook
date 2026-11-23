@@ -308,6 +308,10 @@ sizes, determinism and actual drift).
   known wart, nothing burned, so README gained the dust line, the devlog got
   its closing entry, and Status is DONE. Sixteen sessions, one mechanic,
   thirteen halls.
+- S16b (2026-11-23, user request): README restructured around the free-range
+  experiment itself (the brief, the self-imposed rules, the diary) with the
+  game as the outcome, and a screenshot added (`screenshot.png`: hall 10's
+  stare-flash moment, the signature mechanic). Docs only; code untouched.
 
 ## Geometry rules for listener levels (hard-won, S2+S4)
 - Beam from a guard reaches rows ±2 (dy=2: dx=±3 in wedge; dy=3 unreachable).
